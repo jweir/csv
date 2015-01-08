@@ -33,6 +33,15 @@ func ExampleMarshal() {
 	// "Smith, Joe",M,23,19.07,Sad
 }
 
+func TestMarshal_without_a_slice(t *testing.T) {
+	_, err := Marshal(simple{})
+
+	if err == nil {
+		t.Error("Non slice produced no error")
+	}
+
+}
+
 type simple struct {
 	Name    string `csv:"FullName"`
 	Gender  string
@@ -87,24 +96,55 @@ func TestEncode(t *testing.T) {
 	}
 }
 
-func TestEncodeFieldValue(t *testing.T) {
-	assert := func(v interface{}, expected, tag string) {
-		fv := reflect.ValueOf(v)
-		st := reflect.StructTag(tag)
-		res := encodeFieldValue(fv, st)
+type P struct {
+	First string
+	Last  string
+}
 
-		if res != expected {
-			t.Errorf("%s does not match %s", res, expected)
-		}
+func (p P) MarshalCSV() ([]byte, error) {
+	return []byte(p.First + " " + p.Last), nil
+}
+
+type X struct {
+	First string
+}
+
+func TestEncodeFieldValue(t *testing.T) {
+	var encTests = []struct {
+		val      interface{}
+		expected string
+		tag      string
+	}{
+		// Strings
+		{"ABC", "ABC", ""},
+		{byte(123), "123", ""},
+
+		// Numerics
+		{int(1), "1", ""},
+		{float32(3.2), "3.2", ""},
+		{uint32(123), "123", ""},
+		{complex64(1 + 2i), "(+1+2i)", ""},
+
+		// Boolean
+		{true, "Yes", `true:"Yes" false:"No"`},
+		{false, "No", `true:"Yes" false:"No"`},
+
+		// TODO Array
+		// Interface with Marshaler
+		{P{"Jay", "Zee"}, "Jay Zee", ""},
+
+		// Struct without Marshaler will produce nothing
+		{X{"Jay"}, "", ""},
 	}
 
-	assert(int(1), "1", "")
-	assert(float32(3.2), "3.2", "")
-	assert(true, "Yes", `true:"Yes" false:"No"`)
-	assert(false, "No", `true:"Yes" false:"No"`)
-	assert(uint32(123), "123", "")
-	// TODO Array
-	// TODO Complex
-	// TODO Interface
+	for _, test := range encTests {
+		fv := reflect.ValueOf(test.val)
+		st := reflect.StructTag(test.tag)
+		res := encodeFieldValue(fv, st)
+
+		if res != test.expected {
+			t.Errorf("%s does not match %s", res, test.expected)
+		}
+	}
 
 }

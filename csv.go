@@ -5,10 +5,15 @@ package csv
 import (
 	"bytes"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 )
+
+type Marshaler interface {
+	MarshalCSV() ([]byte, error)
+}
 
 // Marshal returns the CSV encoding of i, which must be a slice struct types.
 //
@@ -36,6 +41,7 @@ func Marshal(i interface{}) ([]byte, error) {
 			enc.Write(encode(v.Index(x)))
 		}
 	default:
+		return []byte{}, errors.New("Only slices can be marshalled")
 	}
 
 	enc.Flush()
@@ -56,6 +62,7 @@ func newEncoder() encoder {
 	}
 }
 
+// encodes a struct into a CSV row
 func encode(v reflect.Value) (out []string) {
 	l := v.Type().NumField()
 
@@ -89,10 +96,12 @@ func encodeFieldValue(fv reflect.Value, st reflect.StructTag) string {
 	case reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint8:
 		return fmt.Sprintf("%v", fv.Uint())
 	case reflect.Array:
-	case reflect.Complex128:
-	case reflect.Complex64:
+	case reflect.Complex64, reflect.Complex128:
+		return fmt.Sprintf("%+.3g", fv.Complex())
 	case reflect.Interface:
-	// time.Time
+		return encodeInterface(fv, st)
+	case reflect.Struct:
+		return encodeInterface(fv, st)
 	default:
 		panic(fmt.Sprintf("Unsupported type %s", fv.Kind()))
 	}
@@ -120,6 +129,21 @@ func encodeBool(b bool, st reflect.StructTag) string {
 		return tv
 	}
 	return v
+}
+
+func encodeInterface(fv reflect.Value, st reflect.StructTag) string {
+	marshalerType := reflect.TypeOf(new(Marshaler)).Elem()
+
+	if fv.Type().Implements(marshalerType) {
+		m := fv.Interface().(Marshaler)
+		b, err := m.MarshalCSV()
+		if err != nil {
+			return ""
+		}
+		return string(b)
+	}
+
+	return ""
 }
 
 func header(f reflect.StructField) (string, bool) {
