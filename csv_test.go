@@ -54,7 +54,7 @@ func TestHeader(t *testing.T) {
 
 	// Get the header when defined via a tag
 	f, _ := x.FieldByName("Name")
-	h, _ := header(f)
+	h, _ := fieldHeaderName(f)
 
 	if h != "FullName" {
 		t.Error("header does not match")
@@ -62,7 +62,7 @@ func TestHeader(t *testing.T) {
 
 	// Use the field FullName when there is no tag
 	f, _ = x.FieldByName("Gender")
-	h, _ = header(f)
+	h, _ = fieldHeaderName(f)
 
 	if h != "Gender" {
 		t.Error("Default header FullName not created")
@@ -72,7 +72,7 @@ func TestHeader(t *testing.T) {
 func TestHeaders(t *testing.T) {
 	x := reflect.TypeOf(simple{})
 
-	hh := headers(x)
+	hh := typeHeaders(x)
 
 	if "[FullName Gender Age]" != fmt.Sprintf("%v", hh) {
 		t.Errorf("Incorrected headers: %v", hh)

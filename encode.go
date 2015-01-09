@@ -3,10 +3,48 @@ package csv
 import (
 	"bytes"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 )
+
+type Marshaler interface {
+	MarshalCSV() ([]byte, error)
+}
+
+// Marshal returns the CSV encoding of i, which must be a slice struct types.
+//
+// Marshal traverses the slice and encodes the primative values.
+//
+// The first row of the CSV output is a header row. The column names are based
+// on the field name.  If a different name is required a struct tag can be used to define a new name.
+//   Field string `csv:"Column Name"`
+//
+// To skip encoding a field use the "-" as the tag value.
+//   Field string `csv:"-"`
+//
+func Marshal(i interface{}) ([]byte, error) {
+	enc := newEncoder()
+
+	v := reflect.ValueOf(i)
+
+	switch v.Kind() {
+	case reflect.Slice:
+		e := v.Index(0)
+		enc.Write(typeHeaders(e.Type()))
+
+		n := v.Len()
+		for x := 0; x < n; x++ {
+			enc.Write(encode(v.Index(x)))
+		}
+	default:
+		return []byte{}, errors.New("Only slices can be marshalled")
+	}
+
+	enc.Flush()
+	return enc.buffer.Bytes(), nil
+}
 
 type encoder struct {
 	*csv.Writer
