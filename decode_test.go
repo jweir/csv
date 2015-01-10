@@ -31,14 +31,15 @@ John Doe,45`)
 
 func TestMarshal(t *testing.T) {
 	type P struct {
-		Name string
-		Age  int
+		Name  string
+		Age   int
+		Happy bool `csv:"Happy" true:"Yes" false:"No"`
 	}
 
-	doc := []byte(`Name,Age
-John,23
-Jane,27
-Bill,28`)
+	doc := []byte(`Name,Age,ignore,Happy
+John,23,,Yes
+Jane,27,,No
+Bill,28,,Yes`)
 
 	pp := []P{}
 
@@ -59,6 +60,13 @@ Bill,28`)
 		n := pp[i].Age
 		if n != v {
 			t.Errorf("expected (%d) got (%d)", v, n)
+		}
+	}
+
+	for i, v := range []bool{true, false, true} {
+		n := pp[i].Happy
+		if n != v {
+			t.Errorf("expected (%s) got (%s)", v, n)
 		}
 	}
 }
@@ -92,42 +100,44 @@ func TestMarshalErrors(t *testing.T) {
 func TestPublicFields(t *testing.T) {
 	type S struct {
 		Name string
-		age  int `csv:"Age"`
+		Age  int `csv:"Age"`
 		priv int `csv:"-"`
 	}
 
 	fs := publicFields(reflect.TypeOf(S{}))
 
 	if len(fs) != 2 {
-		t.Error("Incorrect number of exported fields")
+		t.Error("Incorrect number of exported fields 2 expected got %d", len(fs))
 	}
 
-	if fs[0].Name != "Name" || fs[1].Name != "age" {
+	if fs[0].Name != "Name" || fs[1].Name != "Age" {
 		t.Error("Incorrect returned fields")
 	}
 }
 
 type MFT struct {
 	Name    string
-	age     string `csv:"Age"`
+	age     string // unexported, should not be included
+	Addr    string `csv:"Address"`
 	NoMatch int    // public, but no match in the CSV headers
 }
 
 func TestMapFields(t *testing.T) {
 	pf := publicFields(reflect.TypeOf(MFT{}))
-	headers := []string{"Name", "Age"}
+
+	// 'age' will have no mapping since the age field is not exported
+	headers := []string{"Name", "Address", "age"}
+
 	m := mapFields(headers, pf)
 
 	if len(m) != 2 {
-		t.Error("Incorrect length")
+		t.Errorf("Incorrect length: %d, %v", len(m), m)
 	}
 
-	if m["Name"] != pf[0] {
-		t.Error("Incorrect mapping")
-	}
-
-	if m["Age"] != pf[1] {
-		t.Error("Incorrect mapping")
+	for i, fn := range []string{"Name", "Address"} {
+		if m[fn] != pf[i] {
+			t.Errorf("expected %s got %s", fn, pf[i].Name)
+		}
 	}
 
 }

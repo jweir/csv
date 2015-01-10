@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 func Unmarshal(doc []byte, v interface{}) error {
@@ -72,7 +73,7 @@ func (d *decoder) set(row []string, el *reflect.Value) {
 		case reflect.Float64:
 			// return decodeFloat(64, fv)
 		case reflect.Bool:
-			// return decodeBool(fv.Bool(), st)
+			decodeBool(&f, val, field.Tag)
 		case reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint8:
 			// return fmt.Sprintf("%v", fv.Uint())
 		case reflect.Array:
@@ -86,6 +87,26 @@ func (d *decoder) set(row []string, el *reflect.Value) {
 			panic(fmt.Sprintf("Unsupported type %s", f.Kind()))
 		}
 	}
+}
+
+func decodeBool(f *reflect.Value, val string, tag reflect.StructTag) error {
+	var bv bool
+
+	bt := tag.Get("true")
+	bf := tag.Get("false")
+
+	switch val {
+	case bt:
+		bv = true
+	case bf:
+		bv = false
+	default:
+		bv = true
+	}
+
+	f.SetBool(bv)
+
+	return nil
 }
 
 func decodeInt(f *reflect.Value, val string) error {
@@ -130,7 +151,18 @@ func colNames(c *csv.Reader) []string {
 
 type fieldMap map[string]*reflect.StructField
 
+type colMap struct {
+	sf    *reflect.StructField
+	index int    // colum index
+	name  string // colum name
+}
+
 func mapFields(csvHeaders []string, pubFields []*reflect.StructField) fieldMap {
+	// TODO
+	// get all public fields in the struct
+	// map to the column position which matches its name
+	// note: columns might be excluded
+
 	fm := fieldMap{}
 
 	// seed the fieldMap with accepted columns
@@ -147,21 +179,27 @@ func mapFields(csvHeaders []string, pubFields []*reflect.StructField) fieldMap {
 	}
 
 	return fm
-
 }
 
 func publicFields(t reflect.Type) []*reflect.StructField {
 	var out []*reflect.StructField
 
-	flen := t.NumField()
+	v := reflect.New(t).Elem()
+	flen := v.NumField()
 
 	for i := 0; i < flen; i++ {
+
 		sf := t.Field(i)
+
 		if skipField(sf) {
 			continue
 		}
 
-		out = append(out, &sf)
+		// Work around issue with CanSet not working on struct fields
+		c := string(sf.Name[0])
+		if c == strings.ToUpper(c) {
+			out = append(out, &sf)
+		}
 	}
 
 	return out
