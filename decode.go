@@ -11,15 +11,6 @@ import (
 )
 
 func Unmarshal(doc []byte, v interface{}) error {
-	// x get the headers from the interface
-	// x get the headers from the csv
-	// x map the interface headers to document headers
-
-	// iterate each row in the doc
-	//   create new obj
-	//   populate obj with decoded values
-	//   append obj to interface
-
 	pv := reflect.ValueOf(v)
 
 	if pv.Kind() != reflect.Ptr || pv.IsNil() {
@@ -50,17 +41,107 @@ func Unmarshal(doc []byte, v interface{}) error {
 	return nil
 }
 
+// maps a CSV column Name and index to a StructField
+type fieldColMap struct {
+	colName     string
+	colIndex    int
+	structField *reflect.StructField
+}
+
+// colNames reuturns the CSV header column names
+func colNames(c *csv.Reader) []string {
+	out, err := c.Read()
+
+	if err != nil {
+	}
+
+	return []string(out)
+}
+
+// mapFields creates a set of fieldMap instrances where
+// the CSV colnames and the exported field names intersect
+func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
+	pFields := exportedFields(t)
+
+	cMap := map[string]int{}
+	fMap := []fieldColMap{}
+
+	for i, col := range cols {
+		cMap[col] = i
+	}
+
+	for _, f := range pFields {
+		name, ok := fieldHeaderName(*f)
+
+		if ok == false {
+			continue
+		}
+
+		index, ok := cMap[name]
+
+		if ok == true {
+			fm := fieldColMap{
+				colName:     name,
+				colIndex:    index,
+				structField: f,
+			}
+
+			fMap = append(fMap, fm)
+		}
+	}
+
+	return fMap
+}
+
+func exportedFields(t reflect.Type) []*reflect.StructField {
+	var out []*reflect.StructField
+
+	v := reflect.New(t).Elem()
+	flen := v.NumField()
+
+	for i := 0; i < flen; i++ {
+
+		sf := t.Field(i)
+
+		if skipField(sf) {
+			continue
+		}
+
+		// Work around issue with CanSet not working on struct fields
+		c := string(sf.Name[0])
+		if c == strings.ToUpper(c) {
+			out = append(out, &sf)
+		}
+	}
+
+	return out
+
+}
+
 type decoder struct {
 	*csv.Reader
 	reflect.Type
-	fm   fieldMap
+	fms  []fieldColMap
 	cols []string
 }
 
+func newDecoder(doc []byte, rt reflect.Type) *decoder {
+	b := bytes.NewReader(doc)
+	r := csv.NewReader(b)
+	ch := colNames(r)
+
+	return &decoder{
+		Reader: r,
+		Type:   rt,
+		fms:    mapFieldsToCols(rt, ch),
+	}
+}
+
 func (d *decoder) set(row []string, el *reflect.Value) {
-	for i, col := range d.cols {
-		val := row[i]
-		field := d.fm[col]
+	for _, fm := range d.fms {
+		val := row[fm.colIndex]
+		field := fm.structField
+
 		f := el.FieldByName(field.Name)
 
 		switch f.Kind() {
@@ -124,84 +205,4 @@ func decodeString(f *reflect.Value, val string) error {
 	f.SetString(val)
 
 	return nil
-}
-
-func newDecoder(doc []byte, rt reflect.Type) *decoder {
-	b := bytes.NewReader(doc)
-	r := csv.NewReader(b)
-	ch := colNames(r)
-	pf := publicFields(rt)
-
-	return &decoder{
-		Reader: r,
-		Type:   rt,
-		cols:   ch,
-		fm:     mapFields(ch, pf),
-	}
-}
-
-func colNames(c *csv.Reader) []string {
-	out, err := c.Read()
-
-	if err != nil {
-	}
-
-	return []string(out)
-}
-
-type fieldMap map[string]*reflect.StructField
-
-type colMap struct {
-	sf    *reflect.StructField
-	index int    // colum index
-	name  string // colum name
-}
-
-func mapFields(csvHeaders []string, pubFields []*reflect.StructField) fieldMap {
-	// TODO
-	// get all public fields in the struct
-	// map to the column position which matches its name
-	// note: columns might be excluded
-
-	fm := fieldMap{}
-
-	// seed the fieldMap with accepted columns
-	for _, h := range csvHeaders {
-		fm[h] = &reflect.StructField{}
-	}
-
-	for _, f := range pubFields {
-		name, _ := fieldHeaderName(*f)
-
-		if _, ok := fm[name]; ok {
-			fm[name] = f
-		}
-	}
-
-	return fm
-}
-
-func publicFields(t reflect.Type) []*reflect.StructField {
-	var out []*reflect.StructField
-
-	v := reflect.New(t).Elem()
-	flen := v.NumField()
-
-	for i := 0; i < flen; i++ {
-
-		sf := t.Field(i)
-
-		if skipField(sf) {
-			continue
-		}
-
-		// Work around issue with CanSet not working on struct fields
-		c := string(sf.Name[0])
-		if c == strings.ToUpper(c) {
-			out = append(out, &sf)
-		}
-	}
-
-	return out
-
 }

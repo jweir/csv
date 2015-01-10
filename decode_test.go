@@ -6,18 +6,19 @@ import (
 	"testing"
 )
 
-func XExampleUnMarshal() {
+func ExampleUnMarshal() {
 	type Person struct {
-		Name string `csv:"FullName"`
-		Age  int
+		Name   string `csv:"Full Name"`
+		income string // unexported fields are not Unmarshalled
+		Age    int
 	}
 
 	people := []Person{}
 
-	sample := []byte(`Full Name,Age
-John Doe,45`)
+	sample := []byte(`Full Name,income,Age
+John Doe,"32,000",45`)
 
-	err := Unmarshal(sample, people)
+	err := Unmarshal(sample, &people)
 
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -26,10 +27,10 @@ John Doe,45`)
 	fmt.Printf("%+v", people)
 
 	// Output:
-	// [{Name: John Doe, Age: 45}]
+	// [{Name:John Doe income: Age:45}]
 }
 
-func TestMarshal(t *testing.T) {
+func TestUnMarshal(t *testing.T) {
 	type P struct {
 		Name  string
 		Age   int
@@ -104,7 +105,7 @@ func TestPublicFields(t *testing.T) {
 		priv int `csv:"-"`
 	}
 
-	fs := publicFields(reflect.TypeOf(S{}))
+	fs := exportedFields(reflect.TypeOf(S{}))
 
 	if len(fs) != 2 {
 		t.Error("Incorrect number of exported fields 2 expected got %d", len(fs))
@@ -123,20 +124,29 @@ type MFT struct {
 }
 
 func TestMapFields(t *testing.T) {
-	pf := publicFields(reflect.TypeOf(MFT{}))
+	rt := reflect.TypeOf(MFT{})
 
-	// 'age' will have no mapping since the age field is not exported
-	headers := []string{"Name", "Address", "age"}
-
-	m := mapFields(headers, pf)
-
-	if len(m) != 2 {
-		t.Errorf("Incorrect length: %d, %v", len(m), m)
+	cols := []string{
+		"Name",
+		"age", // should not match since the 'age' field is not exported
+		"Address",
 	}
 
-	for i, fn := range []string{"Name", "Address"} {
-		if m[fn] != pf[i] {
-			t.Errorf("expected %s got %s", fn, pf[i].Name)
+	fm := mapFieldsToCols(rt, cols)
+
+	if len(fm) != 2 {
+		t.Errorf("Expected length of 2, got %d", len(fm))
+	}
+
+	for i, n := range []string{"Name", "Address"} {
+		if fm[i].colName != n {
+			t.Errorf("expected colName of %s got %s", fm[i].colName, n)
+		}
+	}
+
+	for i, n := range []int{0, 2} {
+		if fm[i].colIndex != n {
+			t.Errorf("expected colIndex of %d got %d", fm[i].colIndex, n)
 		}
 	}
 
