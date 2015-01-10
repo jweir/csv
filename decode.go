@@ -32,7 +32,10 @@ func Unmarshal(doc []byte, v interface{}) error {
 			break
 		} else {
 			o := reflect.New(dec.Type).Elem()
-			dec.set(row, &o)
+			err := dec.set(row, &o)
+			if err != nil {
+				return err
+			}
 			rv.Set(reflect.Append(rv, o))
 		}
 
@@ -46,6 +49,7 @@ type fieldColMap struct {
 	colName     string
 	colIndex    int
 	structField *reflect.StructField
+	decode      func(*reflect.Value, string) error
 }
 
 // colNames reuturns the CSV header column names
@@ -85,6 +89,8 @@ func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
 				colIndex:    index,
 				structField: f,
 			}
+
+			assignDecoder(&fm)
 
 			fMap = append(fMap, fm)
 		}
@@ -137,44 +143,61 @@ func newDecoder(doc []byte, rt reflect.Type) *decoder {
 	}
 }
 
-func (d *decoder) set(row []string, el *reflect.Value) {
+type decoderFn func(*reflect.Value, string) error
+
+func assign(fm *fieldColMap, fn decoderFn) {
+	fm.decode = func(f *reflect.Value, v string) error {
+		return fn(f, v)
+	}
+}
+
+func assignDecoder(fm *fieldColMap) {
+	switch fm.structField.Type.Kind() {
+	case reflect.String:
+		assign(fm, fm.decodeString)
+	case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8:
+		assign(fm, fm.decodeInt)
+	case reflect.Float32:
+		// return decodeFloat(&f, strVal)
+	case reflect.Float64:
+		// return decodeFloat(64, fv)
+	case reflect.Bool:
+		assign(fm, fm.decodeBool)
+	case reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint8:
+		// return fmt.Sprintf("%v", fv.Uint())
+	case reflect.Array:
+	case reflect.Complex64, reflect.Complex128:
+		// return fmt.Sprintf("%+.3g", fv.Complex())
+	case reflect.Interface:
+		// return decodeInterface(fv, st)
+	case reflect.Struct:
+		// return decodeInterface(fv, st)
+	default:
+		panic(fmt.Sprintf("Unsupported type %s", fm.structField.Type.Kind()))
+	}
+}
+
+func (d *decoder) set(row []string, el *reflect.Value) error {
 	for _, fm := range d.fms {
 		val := row[fm.colIndex]
 		field := fm.structField
 
 		f := el.FieldByName(field.Name)
-
-		switch f.Kind() {
-		case reflect.String:
-			decodeString(&f, val)
-		case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8:
-			decodeInt(&f, val)
-		case reflect.Float32:
-			// return decodeFloat(&f, strVal)
-		case reflect.Float64:
-			// return decodeFloat(64, fv)
-		case reflect.Bool:
-			decodeBool(&f, val, field.Tag)
-		case reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint8:
-			// return fmt.Sprintf("%v", fv.Uint())
-		case reflect.Array:
-		case reflect.Complex64, reflect.Complex128:
-			// return fmt.Sprintf("%+.3g", fv.Complex())
-		case reflect.Interface:
-			// return decodeInterface(fv, st)
-		case reflect.Struct:
-			// return decodeInterface(fv, st)
-		default:
-			panic(fmt.Sprintf("Unsupported type %s", f.Kind()))
+		if fm.decode != nil {
+			fm.decode(&f, val)
+		} else {
+			return errors.New(fmt.Sprintf("no decoder for %s\n", val))
 		}
 	}
+
+	return nil
 }
 
-func decodeBool(f *reflect.Value, val string, tag reflect.StructTag) error {
+func (fm *fieldColMap) decodeBool(f *reflect.Value, val string) error {
 	var bv bool
 
-	bt := tag.Get("true")
-	bf := tag.Get("false")
+	bt := fm.structField.Tag.Get("true")
+	bf := fm.structField.Tag.Get("false")
 
 	switch val {
 	case bt:
@@ -190,7 +213,7 @@ func decodeBool(f *reflect.Value, val string, tag reflect.StructTag) error {
 	return nil
 }
 
-func decodeInt(f *reflect.Value, val string) error {
+func (fm *fieldColMap) decodeInt(f *reflect.Value, val string) error {
 	i, e := strconv.Atoi(val)
 
 	if e != nil {
@@ -201,7 +224,7 @@ func decodeInt(f *reflect.Value, val string) error {
 	return nil
 }
 
-func decodeString(f *reflect.Value, val string) error {
+func (fm *fieldColMap) decodeString(f *reflect.Value, val string) error {
 	f.SetString(val)
 
 	return nil
