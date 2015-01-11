@@ -8,15 +8,18 @@ import (
 
 func ExampleUnMarshal() {
 	type Person struct {
-		Name   string `csv:"Full Name"`
-		income string // unexported fields are not Unmarshalled
-		Age    int
+		Name    string `csv:"Full Name"`
+		income  string // unexported fields are not Unmarshalled
+		Age     int
+		Address string `csv:"-"` // skip this field
 	}
 
 	people := []Person{}
 
-	sample := []byte(`Full Name,income,Age
-John Doe,"32,000",45`)
+	sample := []byte(
+		`Full Name,income,Age,Address
+John Doe,"32,000",45,"125 Maple St"
+`)
 
 	err := Unmarshal(sample, &people)
 
@@ -27,7 +30,7 @@ John Doe,"32,000",45`)
 	fmt.Printf("%+v", people)
 
 	// Output:
-	// [{Name:John Doe income: Age:45}]
+	// [{Name:John Doe income: Age:45 Address:}]
 }
 
 func TestUnMarshal(t *testing.T) {
@@ -149,5 +152,4 @@ func TestMapFields(t *testing.T) {
 			t.Errorf("expected colIndex of %d got %d", fm[i].colIndex, n)
 		}
 	}
-
 }
