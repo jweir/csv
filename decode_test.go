@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func ExampleUnMarshal() {
+func ExampleUnmarshal() {
 	type Person struct {
 		Name    string `csv:"Full Name"`
 		income  string // unexported fields are not Unmarshalled
@@ -31,30 +31,6 @@ John Doe,"32,000",45,"125 Maple St"
 
 	// Output:
 	// [{Name:John Doe income: Age:45 Address:}]
-}
-
-func ExampleUnmarshal_with_custom_unmarshaler() {
-	type Sku struct {
-		ID string
-	}
-
-	type Part struct {
-		Sku Sku
-	}
-
-	sample := []byte(
-		`A,B
-12,AB
-34,CD
-`)
-
-	parts := []Part{}
-	Unmarshal(sample, &parts)
-
-	fmt.Printf("%+v", parts)
-
-	// Output:
-	// [{Sku:{ID:AB-12+}} {Sku:{ID:CD-34}]
 }
 
 func TestUnmarshal(t *testing.T) {
