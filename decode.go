@@ -143,8 +143,6 @@ func newDecoder(doc []byte, rt reflect.Type) *decoder {
 	}
 }
 
-type decoderFn func(*reflect.Value, string) error
-
 func assign(fm *fieldColMap, fn decoderFn) {
 	fm.decode = func(f *reflect.Value, v string) error {
 		return fn(f, v)
@@ -158,22 +156,13 @@ func assignDecoder(fm *fieldColMap) {
 	case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8:
 		assign(fm, fm.decodeInt)
 	case reflect.Float32:
-		// return decodeFloat(&f, strVal)
+		assign(fm, fm.decodeFloat(32))
 	case reflect.Float64:
-		// return decodeFloat(64, fv)
+		assign(fm, fm.decodeFloat(64))
 	case reflect.Bool:
 		assign(fm, fm.decodeBool)
-	case reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint8:
-		// return fmt.Sprintf("%v", fv.Uint())
-	case reflect.Array:
-	case reflect.Complex64, reflect.Complex128:
-		// return fmt.Sprintf("%+.3g", fv.Complex())
-	case reflect.Interface:
-		// return decodeInterface(fv, st)
-	case reflect.Struct:
-		// return decodeInterface(fv, st)
 	default:
-		panic(fmt.Sprintf("Unsupported type %s", fm.structField.Type.Kind()))
+		assign(fm, fm.ignoreValue)
 	}
 }
 
@@ -192,6 +181,8 @@ func (d *decoder) set(row []string, el *reflect.Value) error {
 
 	return nil
 }
+
+type decoderFn func(*reflect.Value, string) error
 
 func (fm *fieldColMap) decodeBool(f *reflect.Value, val string) error {
 	var bv bool
@@ -227,5 +218,24 @@ func (fm *fieldColMap) decodeInt(f *reflect.Value, val string) error {
 func (fm *fieldColMap) decodeString(f *reflect.Value, val string) error {
 	f.SetString(val)
 
+	return nil
+}
+
+func (fm *fieldColMap) decodeFloat(bit int) decoderFn {
+	return func(f *reflect.Value, val string) error {
+		n, err := strconv.ParseFloat(val, bit)
+
+		if err != nil {
+			return err
+		}
+
+		f.SetFloat(n)
+
+		return nil
+	}
+}
+
+// ignoreValue does nothing. This is for unsupported types.
+func (fm *fieldColMap) ignoreValue(f *reflect.Value, val string) error {
 	return nil
 }

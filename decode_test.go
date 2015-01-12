@@ -33,46 +33,77 @@ John Doe,"32,000",45,"125 Maple St"
 	// [{Name:John Doe income: Age:45 Address:}]
 }
 
-func TestUnMarshal(t *testing.T) {
-	type P struct {
-		Name  string
-		Age   int
-		Happy bool `csv:"Happy" true:"Yes" false:"No"`
+func ExampleUnmarshal_with_custom_unmarshaler() {
+	type Sku struct {
+		ID string
 	}
 
-	doc := []byte(`Name,Age,ignore,Happy
-John,23,,Yes
-Jane,27,,No
-Bill,28,,Yes`)
+	type Part struct {
+		Sku Sku
+	}
+
+	sample := []byte(
+		`A,B
+12,AB
+34,CD
+`)
+
+	parts := []Part{}
+	Unmarshal(sample, &parts)
+
+	fmt.Printf("%+v", parts)
+
+	// Output:
+	// [{Sku:{ID:AB-12+}} {Sku:{ID:CD-34}]
+}
+
+func TestUnmarshal(t *testing.T) {
+	type P struct {
+		String    string
+		Int       int
+		unxported int
+		Bool      bool `true:"Yes" false:"No"`
+		Float32   float32
+		Float64   float64
+		Complex64 complex64 `csv:"C64"`
+		// Struct
+		// Interface
+		// Array
+	}
+
+	doc := []byte(`String,Int,unexported,Bool,Float32,Float64,C64
+John,23,1,Yes,32.2,64.1,1
+Jane,27,2,No,33.1,65.1,2
+Bill,28,3,Yes,34.7,65.1,3`)
 
 	pp := []P{}
 
 	Unmarshal(doc, &pp)
 
 	if len(pp) != 3 {
-		t.Errorf("Incorrect decoded length: %d", len(pp))
+		t.Errorf("Incorrect record length: %d", len(pp))
 	}
 
-	for i, v := range []string{"John", "Jane", "Bill"} {
-		n := pp[i].Name
-		if n != v {
-			t.Errorf("expected (%s) got (%s)", v, n)
+	assert := func(e, a interface{}) {
+		if e != a {
+			t.Errorf("expected (%s) got (%s)", e, a)
 		}
 	}
 
-	for i, v := range []int{23, 27, 28} {
-		n := pp[i].Age
-		if n != v {
-			t.Errorf("expected (%d) got (%d)", v, n)
-		}
+	strs := []string{"John", "Jane", "Bill"}
+	ints := []int{23, 27, 28}
+	bools := []bool{true, false, true}
+	f32s := []float32{32.2, 33.1, 34.7}
+	f64s := []float64{64.1, 65.1, 65.1}
+
+	for i, p := range pp {
+		assert(strs[i], p.String)
+		assert(ints[i], p.Int)
+		assert(bools[i], p.Bool)
+		assert(f32s[i], p.Float32)
+		assert(f64s[i], p.Float64)
 	}
 
-	for i, v := range []bool{true, false, true} {
-		n := pp[i].Happy
-		if n != v {
-			t.Errorf("expected (%s) got (%s)", v, n)
-		}
-	}
 }
 
 func TestMarshalErrors(t *testing.T) {
