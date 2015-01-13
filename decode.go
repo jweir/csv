@@ -25,12 +25,16 @@ type fieldColMap struct {
 	colName     string
 	colIndex    int
 	structField *reflect.StructField
-	decode      func(*reflect.Value, string) error
+	decode      decoderFn
 }
 
-// Unmarshal decos the CSV document into the slice interface.
-func Unmarshal(doc []byte, v interface{}) error {
+// UnMarshaller is the interface implemented by objects which can unmarshall the CSV row itself.
+type Unmarshaler interface {
+	UnmarshalCSV([]string, []string) error
+}
 
+// Unmarshal decodes the CSV document into the slice interface.
+func Unmarshal(doc []byte, v interface{}) error {
 	if err := checkValidInterface(v); err != nil {
 		return err
 	}
@@ -47,7 +51,6 @@ func Unmarshal(doc []byte, v interface{}) error {
 }
 
 func (dec *decoder) unmarshal() error {
-
 	for {
 		row, err := dec.Read()
 
@@ -112,7 +115,7 @@ func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
 				structField: f,
 			}
 
-			assignDecoder(&fm)
+			fm.assignDecoder()
 
 			fMap = append(fMap, fm)
 		}
@@ -172,7 +175,7 @@ func assign(fm *fieldColMap, fn decoderFn) {
 	}
 }
 
-func assignDecoder(fm *fieldColMap) {
+func (fm *fieldColMap) assignDecoder() {
 	switch fm.structField.Type.Kind() {
 	case reflect.String:
 		assign(fm, fm.decodeString)

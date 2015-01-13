@@ -5,26 +5,26 @@ import (
 	"testing"
 )
 
-func TestUnmarshal(t *testing.T) {
-	type P struct {
-		String    string
-		Int       int
-		unxported int
-		Bool      bool `true:"Yes" false:"No"`
-		Float32   float32
-		Float64   float64
-		Complex64 complex64 `csv:"C64"`
-		// Struct
-		// Interface
-		// Array
-	}
+type Q struct {
+	String    string
+	Int       int
+	unxported int
+	Bool      bool `true:"Yes" false:"No"`
+	Float32   float32
+	Float64   float64
+	Complex64 complex64 `csv:"C64"`
+	// Struct
+	// Interface
+	// Array
+}
 
+func TestUnmarshal(t *testing.T) {
 	doc := []byte(`String,Int,unexported,Bool,Float32,Float64,C64
 John,23,1,Yes,32.2,64.1,1
 Jane,27,2,No,33.1,65.1,2
 Bill,28,3,Yes,34.7,65.1,3`)
 
-	pp := []P{}
+	pp := []Q{}
 
 	Unmarshal(doc, &pp)
 
@@ -55,39 +55,32 @@ Bill,28,3,Yes,34.7,65.1,3`)
 }
 
 func TestMarshalErrors(t *testing.T) {
-	type P struct{}
-
 	doc := []byte(`Name,Age`)
-
-	err := Unmarshal(doc, []P{})
-
+	err := Unmarshal(doc, []Q{})
 	if err == nil {
 		t.Error("No error generated for non-pointer")
 	}
 
-	err = Unmarshal(doc, &P{})
-
+	err = Unmarshal(doc, &Q{})
 	if err == nil {
 		t.Error("No error generated for non-slice")
 	}
 
-	pp := []P{}
-
+	pp := []Q{}
 	err = Unmarshal(doc, &pp)
-
 	if err != nil {
 		t.Error("Error returned when not expected:", err)
 	}
 }
 
-func TestPublicFields(t *testing.T) {
-	type S struct {
+func TestExportedFields(t *testing.T) {
+	type s struct {
 		Name string
 		Age  int `csv:"Age"`
 		priv int `csv:"-"`
 	}
 
-	fs := exportedFields(reflect.TypeOf(S{}))
+	fs := exportedFields(reflect.TypeOf(s{}))
 
 	if len(fs) != 2 {
 		t.Error("Incorrect number of exported fields 2 expected got %d", len(fs))
@@ -98,7 +91,7 @@ func TestPublicFields(t *testing.T) {
 	}
 }
 
-type MFT struct {
+type T struct {
 	Name    string
 	age     string // unexported, should not be included
 	Addr    string `csv:"Address"`
@@ -106,8 +99,7 @@ type MFT struct {
 }
 
 func TestMapFields(t *testing.T) {
-	rt := reflect.TypeOf(MFT{})
-
+	rt := reflect.TypeOf(T{})
 	cols := []string{
 		"Name",
 		"age", // should not match since the 'age' field is not exported
@@ -115,7 +107,6 @@ func TestMapFields(t *testing.T) {
 	}
 
 	fm := mapFieldsToCols(rt, cols)
-
 	if len(fm) != 2 {
 		t.Errorf("Expected length of 2, got %d", len(fm))
 	}
