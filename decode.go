@@ -10,20 +10,43 @@ import (
 	"strings"
 )
 
-func Unmarshal(doc []byte, v interface{}) error {
-	pv := reflect.ValueOf(v)
+type decoder struct {
+	*csv.Reader                // the csv document for input
+	reflect.Type               // the underlying struct to decode
+	out          reflect.Value // the slice output
+	fms          []fieldColMap //
+	cols         []string      // colum names
+}
 
-	if pv.Kind() != reflect.Ptr || pv.IsNil() {
-		return errors.New("type is nil or not a pointer")
+type decoderFn func(*reflect.Value, string) error
+
+// maps a CSV column Name and index to a StructField
+type fieldColMap struct {
+	colName     string
+	colIndex    int
+	structField *reflect.StructField
+	decode      func(*reflect.Value, string) error
+}
+
+// Unmarshal decos the CSV document into the slice interface.
+func Unmarshal(doc []byte, v interface{}) error {
+
+	if err := checkValidInterface(v); err != nil {
+		return err
 	}
 
 	rv := reflect.ValueOf(v).Elem()
+	dec, err := newDecoder(doc, rv)
 
-	if rv.Kind() != reflect.Slice {
-		return errors.New(fmt.Sprintf("only slices are allowed: %s", rv.Kind()))
+	if err != nil {
+		return err
 	}
 
-	dec := newDecoder(doc, rv.Type().Elem())
+	dec.unmarshal()
+	return nil
+}
+
+func (dec *decoder) unmarshal() error {
 
 	for {
 		row, err := dec.Read()
@@ -36,30 +59,29 @@ func Unmarshal(doc []byte, v interface{}) error {
 			if err != nil {
 				return err
 			}
-			rv.Set(reflect.Append(rv, o))
+			dec.out.Set(reflect.Append(dec.out, o))
 		}
 
 	}
 
 	return nil
+
 }
 
-// maps a CSV column Name and index to a StructField
-type fieldColMap struct {
-	colName     string
-	colIndex    int
-	structField *reflect.StructField
-	decode      func(*reflect.Value, string) error
-}
+func checkValidInterface(v interface{}) error {
+	pv := reflect.ValueOf(v)
 
-// colNames reuturns the CSV header column names
-func colNames(c *csv.Reader) []string {
-	out, err := c.Read()
-
-	if err != nil {
+	if pv.Kind() != reflect.Ptr || pv.IsNil() {
+		return errors.New("type is nil or not a pointer")
 	}
 
-	return []string(out)
+	rv := reflect.ValueOf(v).Elem()
+
+	if rv.Kind() != reflect.Slice {
+		return fmt.Errorf("only slices are allowed: %s", rv.Kind())
+	}
+
+	return nil
 }
 
 // mapFields creates a set of fieldMap instrances where
@@ -124,23 +146,24 @@ func exportedFields(t reflect.Type) []*reflect.StructField {
 
 }
 
-type decoder struct {
-	*csv.Reader
-	reflect.Type
-	fms  []fieldColMap
-	cols []string
-}
-
-func newDecoder(doc []byte, rt reflect.Type) *decoder {
+func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 	b := bytes.NewReader(doc)
 	r := csv.NewReader(b)
-	ch := colNames(r)
+	cols, err := r.Read()
+
+	if err != nil {
+		return nil, err
+	}
+
+	ch := []string(cols)
+	el := rv.Type().Elem()
 
 	return &decoder{
 		Reader: r,
-		Type:   rt,
-		fms:    mapFieldsToCols(rt, ch),
-	}
+		Type:   el,
+		out:    rv,
+		fms:    mapFieldsToCols(el, ch),
+	}, nil
 }
 
 func assign(fm *fieldColMap, fn decoderFn) {
@@ -166,23 +189,25 @@ func assignDecoder(fm *fieldColMap) {
 	}
 }
 
-func (d *decoder) set(row []string, el *reflect.Value) error {
-	for _, fm := range d.fms {
+func (dec *decoder) set(row []string, el *reflect.Value) error {
+	for _, fm := range dec.fms {
 		val := row[fm.colIndex]
 		field := fm.structField
 
 		f := el.FieldByName(field.Name)
 		if fm.decode != nil {
-			fm.decode(&f, val)
+			err := fm.decode(&f, val)
+
+			if err != nil {
+				return err
+			}
 		} else {
-			return errors.New(fmt.Sprintf("no decoder for %s\n", val))
+			return fmt.Errorf("no decoder for %s\n", val)
 		}
 	}
 
 	return nil
 }
-
-type decoderFn func(*reflect.Value, string) error
 
 func (fm *fieldColMap) decodeBool(f *reflect.Value, val string) error {
 	var bv bool

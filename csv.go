@@ -30,17 +30,3 @@ func fieldHeaderName(f reflect.StructField) (string, bool) {
 
 	return h, true
 }
-
-func typeHeaders(t reflect.Type) (out []string) {
-	l := t.NumField()
-
-	for x := 0; x < l; x++ {
-		f := t.Field(x)
-		h, ok := fieldHeaderName(f)
-		if ok {
-			out = append(out, h)
-		}
-	}
-
-	return
-}

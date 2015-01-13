@@ -36,7 +36,7 @@ func TestHeader(t *testing.T) {
 func TestHeaders(t *testing.T) {
 	x := reflect.TypeOf(simple{})
 
-	hh := typeHeaders(x)
+	hh := colNames(x)
 
 	if "[FullName Gender Age]" != fmt.Sprintf("%v", hh) {
 		t.Errorf("Incorrected headers: %v", hh)

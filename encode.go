@@ -9,22 +9,37 @@ import (
 	"strconv"
 )
 
+// Marshaler is an interface for objects which can Marshal themselves into CSV.
 type Marshaler interface {
 	MarshalCSV() ([]byte, error)
 }
 
-// Marshal returns the CSV encoding of i, which must be a slice struct types.
+type encoder struct {
+	*csv.Writer
+	buffer *bytes.Buffer
+}
+
+// Marshal returns the CSV encoding of i, which must be a slice of struct types.
 //
 // Marshal traverses the slice and encodes the primative values.
 //
 // The first row of the CSV output is a header row. The column names are based
-// on the field name.  If a different name is required a struct tag can be used to define a new name.
+// on the field name.  If a different name is required a struct tag can be used
+// to define a new name.
+//
 //   Field string `csv:"Column Name"`
 //
 // To skip encoding a field use the "-" as the tag value.
+//
 //   Field string `csv:"-"`
 //
 func Marshal(i interface{}) ([]byte, error) {
+
+	x := []byte{}
+	b := bytes.NewBuffer(x)
+
+	fmt.Printf("%v", b)
+
 	enc := newEncoder()
 
 	v := reflect.ValueOf(i)
@@ -32,11 +47,19 @@ func Marshal(i interface{}) ([]byte, error) {
 	switch v.Kind() {
 	case reflect.Slice:
 		e := v.Index(0)
-		enc.Write(typeHeaders(e.Type()))
+		err := enc.Write(colNames(e.Type()))
+
+		if err != nil {
+			return []byte{}, err
+		}
 
 		n := v.Len()
-		for x := 0; x < n; x++ {
-			enc.Write(encode(v.Index(x)))
+		for c := 0; c < n; c++ {
+			err := enc.Write(encode(v.Index(c)))
+
+			if err != nil {
+				return []byte{}, err
+			}
 		}
 	default:
 		return []byte{}, errors.New("Only slices can be marshalled")
@@ -46,9 +69,20 @@ func Marshal(i interface{}) ([]byte, error) {
 	return enc.buffer.Bytes(), nil
 }
 
-type encoder struct {
-	*csv.Writer
-	buffer *bytes.Buffer
+// colNames takes a struct and returns the computed columns names for each
+// field.
+func colNames(t reflect.Type) (out []string) {
+	l := t.NumField()
+
+	for x := 0; x < l; x++ {
+		f := t.Field(x)
+		h, ok := fieldHeaderName(f)
+		if ok {
+			out = append(out, h)
+		}
+	}
+
+	return
 }
 
 func newEncoder() encoder {
