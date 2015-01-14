@@ -99,6 +99,7 @@ type T struct {
 }
 
 func TestMapFields(t *testing.T) {
+	dec := &decoder{}
 	rt := reflect.TypeOf(T{})
 	cols := []string{
 		"Name",
@@ -106,7 +107,9 @@ func TestMapFields(t *testing.T) {
 		"Address",
 	}
 
-	fm := mapFieldsToCols(rt, cols)
+	dec.mapFieldsToCols(rt, cols)
+
+	fm := dec.fms
 	if len(fm) != 2 {
 		t.Errorf("Expected length of 2, got %d", len(fm))
 	}

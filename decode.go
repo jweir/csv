@@ -10,6 +10,34 @@ import (
 	"strings"
 )
 
+type Row struct {
+	Columns *[]string // The name of the columns, in order
+	Data    []string  // the data for the row
+}
+
+func (dec *decoder) newRow(raw []string) *Row {
+	return &Row{
+		Columns: &dec.cols,
+		Data:    raw,
+	}
+}
+
+// At returns the rows data for the column positon i
+func (r *Row) At(i int) string {
+	return r.Data[i]
+}
+
+// Named reutrns the row's data for the first columne named 'n'
+func (r *Row) Named(n string) (string, error) {
+	for i, cn := range *r.Columns {
+		if cn == n {
+			return r.At(i), nil
+		}
+	}
+
+	return "", fmt.Errorf("No column found for %s", n)
+}
+
 type decoder struct {
 	*csv.Reader                // the csv document for input
 	reflect.Type               // the underlying struct to decode
@@ -18,7 +46,7 @@ type decoder struct {
 	cols         []string      // colum names
 }
 
-type decoderFn func(*reflect.Value, string) error
+type decoderFn func(*reflect.Value, *Row) error
 
 // maps a CSV column Name and index to a StructField
 type fieldColMap struct {
@@ -52,11 +80,12 @@ func Unmarshal(doc []byte, v interface{}) error {
 
 func (dec *decoder) unmarshal() error {
 	for {
-		row, err := dec.Read()
+		raw, err := dec.Read()
 
 		if err != nil {
 			break
 		} else {
+			row := dec.newRow(raw)
 			o := reflect.New(dec.Type).Elem()
 			err := dec.set(row, &o)
 			if err != nil {
@@ -111,11 +140,10 @@ func impsUnmarshaller(et reflect.Type, i interface{}) (int, error) {
 
 // mapFields creates a set of fieldMap instrances where
 // the CSV colnames and the exported field names intersect
-func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
+func (dec *decoder) mapFieldsToCols(t reflect.Type, cols []string) {
 	pFields := exportedFields(t)
 
 	cMap := map[string]int{}
-	fMap := []fieldColMap{}
 
 	for i, col := range cols {
 		cMap[col] = i
@@ -124,7 +152,6 @@ func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
 	for _, f := range pFields {
 
 		name, ok := fieldHeaderName(*f)
-
 		if ok == false {
 			continue
 		}
@@ -144,11 +171,10 @@ func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
 				fm.assignDecoder()
 			}
 
-			fMap = append(fMap, fm)
+			dec.fms = append(dec.fms, fm)
 		}
 	}
 
-	return fMap
 }
 
 func exportedFields(t reflect.Type) []*reflect.StructField {
@@ -188,17 +214,20 @@ func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 	ch := []string(cols)
 	el := rv.Type().Elem()
 
-	return &decoder{
+	dec := decoder{
 		Reader: r,
 		Type:   el,
 		out:    rv,
-		fms:    mapFieldsToCols(el, ch),
-	}, nil
+	}
+
+	dec.mapFieldsToCols(el, ch)
+
+	return &dec, nil
 }
 
 func assign(fm *fieldColMap, fn decoderFn) {
-	fm.decode = func(f *reflect.Value, v string) error {
-		return fn(f, v)
+	fm.decode = func(f *reflect.Value, row *Row) error {
+		return fn(f, row)
 	}
 }
 
@@ -210,14 +239,16 @@ func (fm *fieldColMap) assignUnmarshaller(code int) {
 	}
 }
 
-func (fm *fieldColMap) unmarshalPointer(f *reflect.Value, val string) error {
+func (fm *fieldColMap) unmarshalPointer(f *reflect.Value, row *Row) error {
+	val := row.At(fm.colIndex)
 	m := f.Addr().Interface().(Unmarshaler)
 	m.UnmarshalCSV([]string{val}, []string{"d"})
 
 	return nil
 }
 
-func (fm *fieldColMap) unmarshalValue(f *reflect.Value, val string) error {
+func (fm *fieldColMap) unmarshalValue(f *reflect.Value, row *Row) error {
+	val := row.At(fm.colIndex)
 	m := f.Interface().(Unmarshaler)
 	m.UnmarshalCSV([]string{val}, []string{"d"})
 	return nil
@@ -240,27 +271,28 @@ func (fm *fieldColMap) assignDecoder() {
 	}
 }
 
-func (dec *decoder) set(row []string, el *reflect.Value) error {
+// Sets each field value for the el struct for the given row
+func (dec *decoder) set(row *Row, el *reflect.Value) error {
 	for _, fm := range dec.fms {
-		val := row[fm.colIndex]
 		field := fm.structField
 
 		f := el.FieldByName(field.Name)
 		if fm.decode != nil {
-			err := fm.decode(&f, val)
+			err := fm.decode(&f, row)
 
 			if err != nil {
 				return err
 			}
 		} else {
-			return fmt.Errorf("no decoder for %s\n", val)
+			return fmt.Errorf("no decoder for %v\n", field.Name)
 		}
 	}
 
 	return nil
 }
 
-func (fm *fieldColMap) decodeBool(f *reflect.Value, val string) error {
+func (fm *fieldColMap) decodeBool(f *reflect.Value, row *Row) error {
+	val := row.At(fm.colIndex)
 	var bv bool
 
 	bt := fm.structField.Tag.Get("true")
@@ -280,7 +312,8 @@ func (fm *fieldColMap) decodeBool(f *reflect.Value, val string) error {
 	return nil
 }
 
-func (fm *fieldColMap) decodeInt(f *reflect.Value, val string) error {
+func (fm *fieldColMap) decodeInt(f *reflect.Value, row *Row) error {
+	val := row.At(fm.colIndex)
 	i, e := strconv.Atoi(val)
 
 	if e != nil {
@@ -291,14 +324,16 @@ func (fm *fieldColMap) decodeInt(f *reflect.Value, val string) error {
 	return nil
 }
 
-func (fm *fieldColMap) decodeString(f *reflect.Value, val string) error {
+func (fm *fieldColMap) decodeString(f *reflect.Value, row *Row) error {
+	val := row.At(fm.colIndex)
 	f.SetString(val)
 
 	return nil
 }
 
 func (fm *fieldColMap) decodeFloat(bit int) decoderFn {
-	return func(f *reflect.Value, val string) error {
+	return func(f *reflect.Value, row *Row) error {
+		val := row.At(fm.colIndex)
 		n, err := strconv.ParseFloat(val, bit)
 
 		if err != nil {
@@ -312,6 +347,6 @@ func (fm *fieldColMap) decodeFloat(bit int) decoderFn {
 }
 
 // ignoreValue does nothing. This is for unsupported types.
-func (fm *fieldColMap) ignoreValue(f *reflect.Value, val string) error {
+func (fm *fieldColMap) ignoreValue(f *reflect.Value, row *Row) error {
 	return nil
 }
