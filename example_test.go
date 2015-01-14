@@ -5,18 +5,33 @@ import (
 )
 
 type Person struct {
-	Name    string `csv:"Full Name"`
-	income  string // unexported fields are not Unmarshalled
-	Age     int
-	Address string `csv:"-"` // skip this field
+	Name    string  `csv:"Full Name"`
+	income  string  // unexported fields are not Unmarshalled
+	Age     int     `csv:"-"`      // skip this field
+	Address Address `csv:"Street"` // skip this field
+}
+
+type Address struct {
+	City   string
+	Street string
+}
+
+func (a *Address) UnmarshalCSV(val string, row *Row) error {
+	c, _ := row.Named("City")
+	s, _ := row.Named("Street")
+
+	a.Street = s
+	a.City = c
+
+	return nil
 }
 
 func ExampleUnmarshal() {
 	people := []Person{}
 
 	sample := []byte(
-		`Full Name,income,Age,Address
-John Doe,"32,000",45,"125 Maple St"
+		`Full Name,income,Age,City,Street
+John Doe,"32,000",45,Brooklyn,"7th Street"
 `)
 
 	err := Unmarshal(sample, &people)
@@ -28,5 +43,5 @@ John Doe,"32,000",45,"125 Maple St"
 	fmt.Printf("%+v", people)
 
 	// Output:
-	// [{Name:John Doe income: Age:45 Address:}]
+	// [{Name:John Doe income: Age:0 Address:{City:Brooklyn Street:7th Street}}]
 }

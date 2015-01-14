@@ -10,16 +10,10 @@ import (
 	"strings"
 )
 
+// Row is one row of CSV data, indexed by column name or position
 type Row struct {
 	Columns *[]string // The name of the columns, in order
 	Data    []string  // the data for the row
-}
-
-func (dec *decoder) newRow(raw []string) *Row {
-	return &Row{
-		Columns: &dec.cols,
-		Data:    raw,
-	}
 }
 
 // At returns the rows data for the column positon i
@@ -42,23 +36,27 @@ type decoder struct {
 	*csv.Reader                // the csv document for input
 	reflect.Type               // the underlying struct to decode
 	out          reflect.Value // the slice output
-	fms          []fieldColMap //
+	fms          []cfield      //
 	cols         []string      // colum names
 }
 
 type decoderFn func(*reflect.Value, *Row) error
 
 // maps a CSV column Name and index to a StructField
-type fieldColMap struct {
+type cfield struct {
 	colName     string
 	colIndex    int
 	structField *reflect.StructField
 	decode      decoderFn
 }
 
-// UnMarshaller is the interface implemented by objects which can unmarshall the CSV row itself.
+// Unmarshaler is the interface implemented by objects which can unmarshall the CSV row itself.
 type Unmarshaler interface {
-	UnmarshalCSV([]string, []string) error
+
+	// UnmarshalCSV receives a string with the column value matching this field
+	// and a reference to the the current row.
+	// This allows composing a value from mutliple columns.
+	UnmarshalCSV(string, *Row) error
 }
 
 // Unmarshal decodes the CSV document into the slice interface.
@@ -98,6 +96,13 @@ func (dec *decoder) unmarshal() error {
 
 	return nil
 
+}
+
+func (dec *decoder) newRow(raw []string) *Row {
+	return &Row{
+		Columns: &dec.cols,
+		Data:    raw,
+	}
 }
 
 func checkValidInterface(v interface{}) error {
@@ -159,7 +164,7 @@ func (dec *decoder) mapFieldsToCols(t reflect.Type, cols []string) {
 		index, ok := cMap[name]
 
 		if ok == true {
-			fm := fieldColMap{
+			fm := cfield{
 				colName:     name,
 				colIndex:    index,
 				structField: f,
@@ -218,6 +223,7 @@ func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 		Reader: r,
 		Type:   el,
 		out:    rv,
+		cols:   cols,
 	}
 
 	dec.mapFieldsToCols(el, ch)
@@ -225,13 +231,13 @@ func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 	return &dec, nil
 }
 
-func assign(fm *fieldColMap, fn decoderFn) {
+func assign(fm *cfield, fn decoderFn) {
 	fm.decode = func(f *reflect.Value, row *Row) error {
 		return fn(f, row)
 	}
 }
 
-func (fm *fieldColMap) assignUnmarshaller(code int) {
+func (fm *cfield) assignUnmarshaller(code int) {
 	if code == impsPtr {
 		assign(fm, fm.unmarshalPointer)
 	} else {
@@ -239,22 +245,22 @@ func (fm *fieldColMap) assignUnmarshaller(code int) {
 	}
 }
 
-func (fm *fieldColMap) unmarshalPointer(f *reflect.Value, row *Row) error {
+func (fm *cfield) unmarshalPointer(f *reflect.Value, row *Row) error {
 	val := row.At(fm.colIndex)
 	m := f.Addr().Interface().(Unmarshaler)
-	m.UnmarshalCSV([]string{val}, []string{"d"})
+	m.UnmarshalCSV(val, row)
 
 	return nil
 }
 
-func (fm *fieldColMap) unmarshalValue(f *reflect.Value, row *Row) error {
+func (fm *cfield) unmarshalValue(f *reflect.Value, row *Row) error {
 	val := row.At(fm.colIndex)
 	m := f.Interface().(Unmarshaler)
-	m.UnmarshalCSV([]string{val}, []string{"d"})
+	m.UnmarshalCSV(val, row)
 	return nil
 }
 
-func (fm *fieldColMap) assignDecoder() {
+func (fm *cfield) assignDecoder() {
 	switch fm.structField.Type.Kind() {
 	case reflect.String:
 		assign(fm, fm.decodeString)
@@ -291,7 +297,7 @@ func (dec *decoder) set(row *Row, el *reflect.Value) error {
 	return nil
 }
 
-func (fm *fieldColMap) decodeBool(f *reflect.Value, row *Row) error {
+func (fm *cfield) decodeBool(f *reflect.Value, row *Row) error {
 	val := row.At(fm.colIndex)
 	var bv bool
 
@@ -312,7 +318,7 @@ func (fm *fieldColMap) decodeBool(f *reflect.Value, row *Row) error {
 	return nil
 }
 
-func (fm *fieldColMap) decodeInt(f *reflect.Value, row *Row) error {
+func (fm *cfield) decodeInt(f *reflect.Value, row *Row) error {
 	val := row.At(fm.colIndex)
 	i, e := strconv.Atoi(val)
 
@@ -324,14 +330,14 @@ func (fm *fieldColMap) decodeInt(f *reflect.Value, row *Row) error {
 	return nil
 }
 
-func (fm *fieldColMap) decodeString(f *reflect.Value, row *Row) error {
+func (fm *cfield) decodeString(f *reflect.Value, row *Row) error {
 	val := row.At(fm.colIndex)
 	f.SetString(val)
 
 	return nil
 }
 
-func (fm *fieldColMap) decodeFloat(bit int) decoderFn {
+func (fm *cfield) decodeFloat(bit int) decoderFn {
 	return func(f *reflect.Value, row *Row) error {
 		val := row.At(fm.colIndex)
 		n, err := strconv.ParseFloat(val, bit)
@@ -347,6 +353,6 @@ func (fm *fieldColMap) decodeFloat(bit int) decoderFn {
 }
 
 // ignoreValue does nothing. This is for unsupported types.
-func (fm *fieldColMap) ignoreValue(f *reflect.Value, row *Row) error {
+func (fm *cfield) ignoreValue(f *reflect.Value, row *Row) error {
 	return nil
 }

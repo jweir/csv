@@ -127,7 +127,6 @@ func encodeFieldValue(fv reflect.Value, st reflect.StructTag) string {
 		return encodeBool(fv.Bool(), st)
 	case reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint8:
 		return fmt.Sprintf("%v", fv.Uint())
-	case reflect.Array:
 	case reflect.Complex64, reflect.Complex128:
 		return fmt.Sprintf("%+.3g", fv.Complex())
 	case reflect.Interface:

@@ -135,20 +135,21 @@ type U struct {
 	Name Um
 }
 
-func (u *Um) UnmarshalCSV(row []string, cols []string) error {
-	u.V = row[0] + " worked"
+func (u *Um) UnmarshalCSV(val string, row *Row) error {
+	v, _ := row.Named("Age")
+	u.V = row.At(0) + " " + v
 	return nil
 }
 
 func TestCustomUnMarshaller(t *testing.T) {
-	doc := `Name
-Jay`
+	doc := `Name,Age
+Jay,23`
 
 	oo := []U{}
 
 	Unmarshal([]byte(doc), &oo)
 
-	if oo[0].Name.V != "Jay worked" {
+	if oo[0].Name.V != "Jay 23" {
 		t.Errorf("custom unmarshal did not work (%s)", oo[0].Name.V)
 	}
 }
