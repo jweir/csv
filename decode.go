@@ -87,6 +87,28 @@ func checkValidInterface(v interface{}) error {
 	return nil
 }
 
+// interface is implemented on a value
+const impsVal int = 1
+
+// interface is implemented on a pointer
+const impsPtr int = 2
+
+// checks if an object implements the Unmarshaler interface
+func impsUnmarshaller(et reflect.Type, i interface{}) (int, error) {
+	el := reflect.New(et).Elem()
+	it := reflect.TypeOf(i).Elem()
+
+	if el.Type().Implements(it) {
+		return impsVal, nil
+	}
+
+	if el.Addr().Type().Implements(it) {
+		return impsPtr, nil
+	}
+
+	return 0, fmt.Errorf("%v el does not implement %s", el, it.Name())
+}
+
 // mapFields creates a set of fieldMap instrances where
 // the CSV colnames and the exported field names intersect
 func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
@@ -100,6 +122,7 @@ func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
 	}
 
 	for _, f := range pFields {
+
 		name, ok := fieldHeaderName(*f)
 
 		if ok == false {
@@ -115,7 +138,11 @@ func mapFieldsToCols(t reflect.Type, cols []string) []fieldColMap {
 				structField: f,
 			}
 
-			fm.assignDecoder()
+			if code, err := impsUnmarshaller(f.Type, new(Unmarshaler)); err == nil {
+				fm.assignUnmarshaller(code)
+			} else {
+				fm.assignDecoder()
+			}
 
 			fMap = append(fMap, fm)
 		}
@@ -173,6 +200,27 @@ func assign(fm *fieldColMap, fn decoderFn) {
 	fm.decode = func(f *reflect.Value, v string) error {
 		return fn(f, v)
 	}
+}
+
+func (fm *fieldColMap) assignUnmarshaller(code int) {
+	if code == impsPtr {
+		assign(fm, fm.unmarshalPointer)
+	} else {
+		assign(fm, fm.unmarshalValue)
+	}
+}
+
+func (fm *fieldColMap) unmarshalPointer(f *reflect.Value, val string) error {
+	m := f.Addr().Interface().(Unmarshaler)
+	m.UnmarshalCSV([]string{val}, []string{"d"})
+
+	return nil
+}
+
+func (fm *fieldColMap) unmarshalValue(f *reflect.Value, val string) error {
+	m := f.Interface().(Unmarshaler)
+	m.UnmarshalCSV([]string{val}, []string{"d"})
+	return nil
 }
 
 func (fm *fieldColMap) assignDecoder() {

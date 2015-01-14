@@ -123,3 +123,29 @@ func TestMapFields(t *testing.T) {
 		}
 	}
 }
+
+type Um struct {
+	V string
+}
+
+type U struct {
+	Name Um
+}
+
+func (u *Um) UnmarshalCSV(row []string, cols []string) error {
+	u.V = row[0] + " worked"
+	return nil
+}
+
+func TestCustomUnMarshaller(t *testing.T) {
+	doc := `Name
+Jay`
+
+	oo := []U{}
+
+	Unmarshal([]byte(doc), &oo)
+
+	if oo[0].Name.V != "Jay worked" {
+		t.Errorf("custom unmarshal did not work (%s)", oo[0].Name.V)
+	}
+}

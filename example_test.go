@@ -4,14 +4,14 @@ import (
 	"fmt"
 )
 
-func ExampleUnmarshal() {
-	type Person struct {
-		Name    string `csv:"Full Name"`
-		income  string // unexported fields are not Unmarshalled
-		Age     int
-		Address string `csv:"-"` // skip this field
-	}
+type Person struct {
+	Name    string `csv:"Full Name"`
+	income  string // unexported fields are not Unmarshalled
+	Age     int
+	Address string `csv:"-"` // skip this field
+}
 
+func ExampleUnmarshal() {
 	people := []Person{}
 
 	sample := []byte(
