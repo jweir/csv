@@ -28,7 +28,7 @@ func (r *Row) Named(n string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("No column found for %s", n)
+	return "", fmt.Errorf("no column found for %s", n)
 }
 
 type decoder struct {

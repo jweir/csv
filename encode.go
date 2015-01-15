@@ -63,7 +63,7 @@ func Marshal(i interface{}) ([]byte, error) {
 			}
 		}
 	default:
-		return []byte{}, errors.New("Only slices can be marshalled")
+		return []byte{}, errors.New("only slices can be marshalled")
 	}
 
 	enc.Flush()
