@@ -13,9 +13,6 @@ type Q struct {
 	Float32   float32
 	Float64   float64
 	Complex64 complex64 `csv:"C64"`
-	// Struct
-	// Interface
-	// Array
 }
 
 func TestUnmarshal(t *testing.T) {
