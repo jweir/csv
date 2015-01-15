@@ -33,7 +33,7 @@ func (r *Row) Named(n string) (string, error) {
 }
 
 type decoder struct {
-	*csv.Reader                // the csv document for input
+	csv          *csv.Reader   // the csv document for input
 	reflect.Type               // the underlying struct to decode
 	out          reflect.Value // the slice output
 	fms          []cfield      //
@@ -78,7 +78,7 @@ func Unmarshal(doc []byte, v interface{}) error {
 
 func (dec *decoder) unmarshal() error {
 	for {
-		raw, err := dec.Read()
+		raw, err := dec.csv.Read()
 
 		if err != nil {
 			break
@@ -216,17 +216,16 @@ func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 		return nil, err
 	}
 
-	ch := []string(cols)
 	el := rv.Type().Elem()
 
 	dec := decoder{
-		Reader: r,
-		Type:   el,
-		out:    rv,
-		cols:   cols,
+		Type: el,
+		csv:  r,
+		out:  rv,
+		cols: cols,
 	}
 
-	dec.mapFieldsToCols(el, ch)
+	dec.mapFieldsToCols(el, cols)
 
 	return &dec, nil
 }
