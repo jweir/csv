@@ -33,6 +33,8 @@ type encoder struct {
 //
 //   Field string `csv:"-"`
 //
+// Boolean fields can use string values to define true or false.
+//   Bool bool `true:"Yes" false:"No"`
 func Marshal(i interface{}) ([]byte, error) {
 
 	x := []byte{}

@@ -57,7 +57,15 @@ type Unmarshaler interface {
 	UnmarshalCSV(string, *Row) error
 }
 
-// Unmarshal decodes the CSV document into the slice interface.
+// Unmarshal parses the CSV document and stores the result in the value pointed to by v. Only a slice of a struct is allowed for v.
+//
+// The first line of the CSV is document is used for column names.  These are
+// paired to matching exported fields in v's type. See Marshal on how to use tags
+// to map to different names and additional options.
+//
+// Supported Types
+//
+// string, int, float and bool are supported. Any type which implements Unmarshal is also supported.
 func Unmarshal(doc []byte, v interface{}) error {
 	if err := checkValidInterface(v); err != nil {
 		return err
