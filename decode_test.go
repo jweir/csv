@@ -114,12 +114,6 @@ func TestMapFields(t *testing.T) {
 		t.Errorf("Expected length of 2, got %d", len(fm))
 	}
 
-	for i, n := range []string{"Name", "Address"} {
-		if fm[i].colName != n {
-			t.Errorf("expected colName of %s got %s", fm[i].colName, n)
-		}
-	}
-
 	for i, n := range []int{0, 2} {
 		if fm[i].colIndex != n {
 			t.Errorf("expected colIndex of %d got %d", fm[i].colIndex, n)

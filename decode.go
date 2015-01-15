@@ -43,7 +43,6 @@ type decoderFn func(*reflect.Value, *Row) error
 
 // maps a CSV column Name and index to a StructField
 type cfield struct {
-	colName     string
 	colIndex    int
 	structField *reflect.StructField
 	decode      decoderFn
@@ -164,7 +163,6 @@ func (dec *decoder) mapFieldsToCols(t reflect.Type, cols []string) {
 
 		if ok == true {
 			fm := cfield{
-				colName:     name,
 				colIndex:    index,
 				structField: f,
 			}
