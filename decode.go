@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 )
 
 // Row is one row of CSV data, indexed by column name or position
@@ -190,15 +189,15 @@ func exportedFields(t reflect.Type) []*reflect.StructField {
 
 	for i := 0; i < flen; i++ {
 
+		// Get the StructField from the Type
 		sf := t.Field(i)
 
 		if skipField(sf) {
 			continue
 		}
 
-		// Work around issue with CanSet not working on struct fields
-		c := string(sf.Name[0])
-		if c == strings.ToUpper(c) {
+		// Check if the field is CanSet from the value (v)
+		if v.Field(i).CanSet() == true {
 			out = append(out, &sf)
 		}
 	}
