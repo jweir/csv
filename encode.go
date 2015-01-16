@@ -36,19 +36,17 @@ type encoder struct {
 // Boolean fields can use string values to define true or false.
 //   Bool bool `true:"Yes" false:"No"`
 func Marshal(i interface{}) ([]byte, error) {
-	x := []byte{}
-	b := bytes.NewBuffer(x)
-
-	fmt.Printf("%v", b)
-
-	enc := newEncoder()
+	var enc *encoder
 
 	v := reflect.ValueOf(i)
 
 	switch v.Kind() {
 	case reflect.Slice:
-		e := v.Index(0)
-		err := enc.Write(colNames(e.Type()))
+		el := v.Index(0)
+		enc = newEncoder()
+
+		// Write the column headers
+		err := enc.Write(colNames(el.Type()))
 
 		if err != nil {
 			return []byte{}, err
@@ -70,6 +68,15 @@ func Marshal(i interface{}) ([]byte, error) {
 	return enc.buffer.Bytes(), nil
 }
 
+func newEncoder() *encoder {
+	b := bytes.NewBuffer([]byte{})
+
+	return &encoder{
+		buffer: b,
+		Writer: csv.NewWriter(b),
+	}
+}
+
 // colNames takes a struct and returns the computed columns names for each
 // field.
 func colNames(t reflect.Type) (out []string) {
@@ -84,15 +91,6 @@ func colNames(t reflect.Type) (out []string) {
 	}
 
 	return
-}
-
-func newEncoder() encoder {
-	b := bytes.NewBuffer([]byte{})
-
-	return encoder{
-		buffer: b,
-		Writer: csv.NewWriter(b),
-	}
 }
 
 // encodes a struct into a CSV row

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 )
 
 // Row is one row of CSV data, indexed by column name or position
@@ -37,15 +36,6 @@ type decoder struct {
 	out          reflect.Value // the slice output
 	fms          []cfield      //
 	cols         []string      // colum names
-}
-
-type decoderFn func(*reflect.Value, *Row) error
-
-// maps a CSV column Name and index to a StructField
-type cfield struct {
-	colIndex    int
-	structField *reflect.StructField
-	decode      decoderFn
 }
 
 // Unmarshaler is the interface implemented by objects which can unmarshall the CSV row itself.
@@ -178,7 +168,7 @@ func (dec *decoder) mapFieldsToCols(t reflect.Type, cols []string) {
 			if code, err := impsUnmarshaller(f.Type, new(Unmarshaler)); err == nil {
 				fm.assignUnmarshaller(code)
 			} else {
-				fm.assignDecoder()
+				assignDecoder(&fm)
 			}
 
 			dec.fms = append(dec.fms, fm)
@@ -235,128 +225,35 @@ func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 	return &dec, nil
 }
 
-func assign(fm *cfield, fn decoderFn) {
-	fm.decode = func(f *reflect.Value, row *Row) error {
-		return fn(f, row)
-	}
-}
-
-func (fm *cfield) assignUnmarshaller(code int) {
-	if code == impsPtr {
-		assign(fm, fm.unmarshalPointer)
-	} else {
-		assign(fm, fm.unmarshalValue)
-	}
-}
-
-func (fm *cfield) unmarshalPointer(f *reflect.Value, row *Row) error {
-	val := row.At(fm.colIndex)
-	m := f.Addr().Interface().(Unmarshaler)
-	m.UnmarshalCSV(val, row)
-
-	return nil
-}
-
-func (fm *cfield) unmarshalValue(f *reflect.Value, row *Row) error {
-	val := row.At(fm.colIndex)
-	m := f.Interface().(Unmarshaler)
-	m.UnmarshalCSV(val, row)
-	return nil
-}
-
-func (fm *cfield) assignDecoder() {
-	switch fm.structField.Type.Kind() {
-	case reflect.String:
-		assign(fm, fm.decodeString)
-	case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8:
-		assign(fm, fm.decodeInt)
-	case reflect.Float32:
-		assign(fm, fm.decodeFloat(32))
-	case reflect.Float64:
-		assign(fm, fm.decodeFloat(64))
-	case reflect.Bool:
-		assign(fm, fm.decodeBool)
-	default:
-		assign(fm, fm.ignoreValue)
-	}
-}
-
 // Sets each field value for the el struct for the given row
 func (dec *decoder) set(row *Row, el *reflect.Value) error {
 	for _, fm := range dec.fms {
 		field := fm.structField
 
 		f := el.FieldByName(field.Name)
-		if fm.decode != nil {
-			err := fm.decode(&f, row)
-
-			if err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("no decoder for %v\n", field.Name)
-		}
-	}
-
-	return nil
-}
-
-func (fm *cfield) decodeBool(f *reflect.Value, row *Row) error {
-	val := row.At(fm.colIndex)
-	var bv bool
-
-	bt := fm.structField.Tag.Get("true")
-	bf := fm.structField.Tag.Get("false")
-
-	switch val {
-	case bt:
-		bv = true
-	case bf:
-		bv = false
-	default:
-		bv = true
-	}
-
-	f.SetBool(bv)
-
-	return nil
-}
-
-func (fm *cfield) decodeInt(f *reflect.Value, row *Row) error {
-	val := row.At(fm.colIndex)
-	i, e := strconv.Atoi(val)
-
-	if e != nil {
-		return e
-	}
-
-	f.SetInt(int64(i))
-	return nil
-}
-
-func (fm *cfield) decodeString(f *reflect.Value, row *Row) error {
-	val := row.At(fm.colIndex)
-	f.SetString(val)
-
-	return nil
-}
-
-func (fm *cfield) decodeFloat(bit int) decoderFn {
-	return func(f *reflect.Value, row *Row) error {
-		val := row.At(fm.colIndex)
-		n, err := strconv.ParseFloat(val, bit)
+		err := fm.decode(&f, row)
 
 		if err != nil {
 			return err
 		}
-
-		f.SetFloat(n)
-
-		return nil
 	}
+
+	return nil
 }
 
-// ignoreValue does nothing. This is for unsupported types.
-func (fm *cfield) ignoreValue(f *reflect.Value, row *Row) error {
-	return nil
+func assignDecoder(fm *cfield) {
+	switch fm.structField.Type.Kind() {
+	case reflect.String:
+		fm.assign(fm.decodeString)
+	case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8:
+		fm.assign(fm.decodeInt)
+	case reflect.Float32:
+		fm.assign(fm.decodeFloat(32))
+	case reflect.Float64:
+		fm.assign(fm.decodeFloat(64))
+	case reflect.Bool:
+		fm.assign(fm.decodeBool)
+	default:
+		fm.assign(fm.ignoreValue)
+	}
 }
