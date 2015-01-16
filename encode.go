@@ -36,30 +36,32 @@ type encoder struct {
 // Boolean fields can use string values to define true or false.
 //   Bool bool `true:"Yes" false:"No"`
 func Marshal(i interface{}) ([]byte, error) {
+	// validate the interface
+	// create a new encoder
+	//   assing the cfields
+	// get the headers
+	// encoder each row
 	var enc *encoder
 
-	v := reflect.ValueOf(i)
+	data := reflect.ValueOf(i)
 
-	switch v.Kind() {
+	switch data.Kind() {
 	case reflect.Slice:
-		el := v.Index(0)
+		el := data.Index(0)
 		enc = newEncoder()
 
 		// Write the column headers
 		err := enc.Write(colNames(el.Type()))
+		if err != nil {
+			return []byte{}, err
+		}
+
+		err = enc.encodeAll(data)
 
 		if err != nil {
 			return []byte{}, err
 		}
 
-		n := v.Len()
-		for c := 0; c < n; c++ {
-			err := enc.Write(encode(v.Index(c)))
-
-			if err != nil {
-				return []byte{}, err
-			}
-		}
 	default:
 		return []byte{}, errors.New("only slices can be marshalled")
 	}
@@ -93,8 +95,32 @@ func colNames(t reflect.Type) (out []string) {
 	return
 }
 
+// encodeAll iterates over each item in data, encoder it then writes it
+func (enc *encoder) encodeAll(data reflect.Value) error {
+	n := data.Len()
+	for c := 0; c < n; c++ {
+		row, err := enc.encodeRow(data.Index(c))
+
+		if err != nil {
+			return err
+		}
+
+		err = enc.Write(row)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // encodes a struct into a CSV row
-func encode(v reflect.Value) (out []string) {
+func (enc *encoder) encodeRow(v reflect.Value) ([]string, error) {
+
+	var row []string
+	// TODO env.columns should map to a cfield
+	// iterate over each cfield and encode with it
 	l := v.Type().NumField()
 
 	for x := 0; x < l; x++ {
@@ -104,15 +130,15 @@ func encode(v reflect.Value) (out []string) {
 		if st.Get("csv") == "-" {
 			continue
 		}
-		o := encodeFieldValue(fv, st)
-		out = append(out, o)
+		o := enc.encodeCol(fv, st)
+		row = append(row, o)
 	}
 
-	return
+	return row, nil
 }
 
 // Returns the string representation of the field value
-func encodeFieldValue(fv reflect.Value, st reflect.StructTag) string {
+func (enc *encoder) encodeCol(fv reflect.Value, st reflect.StructTag) string {
 	switch fv.Kind() {
 	case reflect.String:
 		return fv.String()

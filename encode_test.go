@@ -50,10 +50,12 @@ func TestEncodeFieldValue(t *testing.T) {
 		{X{"Jay"}, "", ""},
 	}
 
+	enc := &encoder{}
+
 	for _, test := range encTests {
 		fv := reflect.ValueOf(test.val)
 		st := reflect.StructTag(test.tag)
-		res := encodeFieldValue(fv, st)
+		res := enc.encodeCol(fv, st)
 
 		if res != test.expected {
 			t.Errorf("%s does not match %s", res, test.expected)
