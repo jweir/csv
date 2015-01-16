@@ -106,7 +106,7 @@ func TestMapFields(t *testing.T) {
 
 	dec.mapFieldsToCols(rt, cols)
 
-	fm := dec.fms
+	fm := dec.cfields
 	if len(fm) != 2 {
 		t.Errorf("Expected length of 2, got %d", len(fm))
 	}

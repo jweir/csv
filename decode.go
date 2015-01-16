@@ -34,7 +34,7 @@ type decoder struct {
 	csv          *csv.Reader   // the csv document for input
 	reflect.Type               // the underlying struct to decode
 	out          reflect.Value // the slice output
-	fms          []cfield      //
+	cfields      []cfield      //
 	cols         []string      // colum names
 }
 
@@ -171,7 +171,7 @@ func (dec *decoder) mapFieldsToCols(t reflect.Type, cols []string) {
 				assignDecoder(&fm)
 			}
 
-			dec.fms = append(dec.fms, fm)
+			dec.cfields = append(dec.cfields, fm)
 		}
 	}
 
@@ -227,7 +227,7 @@ func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 
 // Sets each field value for the el struct for the given row
 func (dec *decoder) set(row *Row, el *reflect.Value) error {
-	for _, fm := range dec.fms {
+	for _, fm := range dec.cfields {
 		field := fm.structField
 
 		f := el.FieldByName(field.Name)
