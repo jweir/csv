@@ -96,15 +96,14 @@ type T struct {
 }
 
 func TestMapFields(t *testing.T) {
-	dec := &decoder{}
-	rt := reflect.TypeOf(T{})
+	dec := &decoder{Type: reflect.TypeOf(T{})}
 	cols := []string{
 		"Name",
 		"age", // should not match since the 'age' field is not exported
 		"Address",
 	}
 
-	dec.mapFieldsToCols(rt, cols)
+	dec.mapFieldsToCols(cols)
 
 	fm := dec.cfields
 	if len(fm) != 2 {

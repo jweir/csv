@@ -42,16 +42,17 @@ func Marshal(i interface{}) ([]byte, error) {
 	// get the headers
 	// encoder each row
 	var enc *encoder
+	var err error
 
 	data := reflect.ValueOf(i)
 
 	switch data.Kind() {
 	case reflect.Slice:
 		el := data.Index(0)
-		enc = newEncoder()
+
+		enc, err = newEncoder(el)
 
 		// Write the column headers
-		err := enc.Write(colNames(el.Type()))
 		if err != nil {
 			return []byte{}, err
 		}
@@ -70,13 +71,17 @@ func Marshal(i interface{}) ([]byte, error) {
 	return enc.buffer.Bytes(), nil
 }
 
-func newEncoder() *encoder {
+func newEncoder(el reflect.Value) (*encoder, error) {
 	b := bytes.NewBuffer([]byte{})
 
-	return &encoder{
+	enc := &encoder{
 		buffer: b,
 		Writer: csv.NewWriter(b),
 	}
+
+	err := enc.Write(colNames(el.Type()))
+
+	return enc, err
 }
 
 // colNames takes a struct and returns the computed columns names for each

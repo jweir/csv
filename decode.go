@@ -8,7 +8,7 @@ import (
 	"reflect"
 )
 
-// Row is one row of CSV data, indexed by column name or position
+// Row is one row of CSV data, indexed by column name or position.
 type Row struct {
 	Columns *[]string // The name of the columns, in order
 	Data    []string  // the data for the row
@@ -19,7 +19,7 @@ func (r *Row) At(i int) string {
 	return r.Data[i]
 }
 
-// Named reutrns the row's data for the first columne named 'n'
+// Named returns the row's data for the first columne named 'n'
 func (r *Row) Named(n string) (string, error) {
 	for i, cn := range *r.Columns {
 		if cn == n {
@@ -57,11 +57,12 @@ type Unmarshaler interface {
 //
 // string, int, float and bool are supported. Any type which implements Unmarshal is also supported.
 func Unmarshal(doc []byte, v interface{}) error {
-	if err := checkValidInterface(v); err != nil {
+	rv, err := checkForSlice(v)
+
+	if err != nil {
 		return err
 	}
 
-	rv := reflect.ValueOf(v).Elem()
 	dec, err := newDecoder(doc, rv)
 
 	if err != nil {
@@ -101,29 +102,32 @@ func (dec *decoder) newRow(raw []string) *Row {
 	}
 }
 
-func checkValidInterface(v interface{}) error {
+// checkForSlice validates that the interface is a slice type
+func checkForSlice(v interface{}) (reflect.Value, error) {
 	pv := reflect.ValueOf(v)
 
 	if pv.Kind() != reflect.Ptr || pv.IsNil() {
-		return errors.New("type is nil or not a pointer")
+		return pv, errors.New("type is nil or not a pointer")
 	}
 
 	rv := reflect.ValueOf(v).Elem()
 
 	if rv.Kind() != reflect.Slice {
-		return fmt.Errorf("only slices are allowed: %s", rv.Kind())
+		return rv, fmt.Errorf("only slices are allowed: %s", rv.Kind())
 	}
 
-	return nil
+	return rv, nil
 }
 
-// interface is implemented on a value
-const impsVal int = 1
+const (
+	// interface is implemented on a value
+	impsVal int = 1
 
-// interface is implemented on a pointer
-const impsPtr int = 2
+	// interface is implemented on a pointer
+	impsPtr int = 2
+)
 
-// checks if an object implements the Unmarshaler interface
+// impsUnmarshaller checks if an object implements the Unmarshaler interface
 func impsUnmarshaller(et reflect.Type, i interface{}) (int, error) {
 	el := reflect.New(et).Elem()
 	it := reflect.TypeOf(i).Elem()
@@ -139,10 +143,12 @@ func impsUnmarshaller(et reflect.Type, i interface{}) (int, error) {
 	return 0, fmt.Errorf("%v el does not implement %s", el, it.Name())
 }
 
-// mapFields creates a set of fieldMap instrances where
-// the CSV colnames and the exported field names intersect
-func (dec *decoder) mapFieldsToCols(t reflect.Type, cols []string) {
-	pFields := exportedFields(t)
+// mapFields creates a set of fieldMap instances.
+//
+// A cfield is created when a column name matches an exported field name in the
+// decoder's Type.
+func (dec *decoder) mapFieldsToCols(cols []string) {
+	pFields := exportedFields(dec.Type)
 
 	cMap := map[string]int{}
 
@@ -160,23 +166,25 @@ func (dec *decoder) mapFieldsToCols(t reflect.Type, cols []string) {
 		index, ok := cMap[name]
 
 		if ok == true {
-			fm := cfield{
+			cf := cfield{
 				colIndex:    index,
 				structField: f,
 			}
 
 			if code, err := impsUnmarshaller(f.Type, new(Unmarshaler)); err == nil {
-				fm.assignUnmarshaller(code)
+				cf.assignUnmarshaller(code)
 			} else {
-				assignDecoder(&fm)
+				cf.assignDecoder()
 			}
 
-			dec.cfields = append(dec.cfields, fm)
+			dec.cfields = append(dec.cfields, cf)
 		}
 	}
-
 }
 
+// exportedFields returns a slice of fields which can be set
+// and are not defined as omitted by the user by decaraling "csv:"" in the
+// field's tag.
 func exportedFields(t reflect.Type) []*reflect.StructField {
 	var out []*reflect.StructField
 
@@ -220,18 +228,17 @@ func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 		cols: cols,
 	}
 
-	dec.mapFieldsToCols(el, cols)
+	dec.mapFieldsToCols(cols)
 
 	return &dec, nil
 }
 
 // Sets each field value for the el struct for the given row
 func (dec *decoder) set(row *Row, el *reflect.Value) error {
-	for _, fm := range dec.cfields {
-		field := fm.structField
-
+	for _, cf := range dec.cfields {
+		field := cf.structField
 		f := el.FieldByName(field.Name)
-		err := fm.decode(&f, row)
+		err := cf.decode(&f, row)
 
 		if err != nil {
 			return err
@@ -239,21 +246,4 @@ func (dec *decoder) set(row *Row, el *reflect.Value) error {
 	}
 
 	return nil
-}
-
-func assignDecoder(fm *cfield) {
-	switch fm.structField.Type.Kind() {
-	case reflect.String:
-		fm.assign(fm.decodeString)
-	case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8:
-		fm.assign(fm.decodeInt)
-	case reflect.Float32:
-		fm.assign(fm.decodeFloat(32))
-	case reflect.Float64:
-		fm.assign(fm.decodeFloat(64))
-	case reflect.Bool:
-		fm.assign(fm.decodeBool)
-	default:
-		fm.assign(fm.ignoreValue)
-	}
 }
