@@ -41,30 +41,25 @@ func Marshal(i interface{}) ([]byte, error) {
 	//   assing the cfields
 	// get the headers
 	// encoder each row
-	var enc *encoder
-	var err error
 
 	data := reflect.ValueOf(i)
 
-	switch data.Kind() {
-	case reflect.Slice:
-		el := data.Index(0)
-
-		enc, err = newEncoder(el)
-
-		// Write the column headers
-		if err != nil {
-			return []byte{}, err
-		}
-
-		err = enc.encodeAll(data)
-
-		if err != nil {
-			return []byte{}, err
-		}
-
-	default:
+	if data.Kind() != reflect.Slice {
 		return []byte{}, errors.New("only slices can be marshalled")
+	}
+
+	el := data.Index(0)
+	enc, err := newEncoder(el)
+
+	// Write the column headers
+	if err != nil {
+		return []byte{}, err
+	}
+
+	err = enc.encodeAll(data)
+
+	if err != nil {
+		return []byte{}, err
 	}
 
 	enc.Flush()
