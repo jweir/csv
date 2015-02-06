@@ -6,14 +6,6 @@ import (
 	"reflect"
 )
 
-func skipField(f reflect.StructField) bool {
-	if f.Tag.Get("csv") == "-" {
-		return true
-	}
-
-	return false
-}
-
 // fieldHeaderName returns the header name to use for the given StructField
 // This can be a user defined name (via the Tag) or a default name.
 func fieldHeaderName(f reflect.StructField) (string, bool) {

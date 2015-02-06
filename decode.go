@@ -180,8 +180,6 @@ func (dec *decoder) mapFieldsToCols(cols []string) {
 }
 
 // exportedFields returns a slice of fields which can be set
-// and are not defined as omitted by the user by decaraling "csv:"" in the
-// field's tag.
 func exportedFields(t reflect.Type) []*reflect.StructField {
 	var out []*reflect.StructField
 
@@ -192,10 +190,6 @@ func exportedFields(t reflect.Type) []*reflect.StructField {
 
 		// Get the StructField from the Type
 		sf := t.Field(i)
-
-		if skipField(sf) {
-			continue
-		}
 
 		// Check if the field is CanSet from the value (v)
 		if v.Field(i).CanSet() == true {

@@ -11,6 +11,7 @@ type simple struct {
 	Gender  string
 	private int `csv:"-"`
 	Age     int
+	Ignore  string `csv:"-"`
 }
 
 func TestHeader(t *testing.T) {
@@ -30,6 +31,14 @@ func TestHeader(t *testing.T) {
 
 	if h != "Gender" {
 		t.Error("Default header FullName not created")
+	}
+
+	// Get the header when defined via a tag
+	f, _ = x.FieldByName("Ignore")
+	_, ok := fieldHeaderName(f)
+
+	if ok == true {
+		t.Error("Omitted field returned ok")
 	}
 }
 
