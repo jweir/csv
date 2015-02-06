@@ -15,25 +15,22 @@ type cfield struct {
 	decoder     decoderFn
 }
 
-func (cf *cfield) decode(cell *reflect.Value, row *Row) error {
-	if cf.decoder == nil {
-		return fmt.Errorf("no decoder for %v\n", cf.structField.Name)
+func newCfield(index int, sf *reflect.StructField) cfield {
+	cf := cfield{
+		colIndex:    index,
+		structField: sf,
 	}
 
-	return cf.decoder(cell, row)
-}
+	cf.decoder = cf.unassignedDecoder
 
-func (cf *cfield) assign(fn decoderFn) {
-	cf.decoder = func(cell *reflect.Value, row *Row) error {
-		return fn(cell, row)
-	}
+	return cf
 }
 
 func (cf *cfield) assignUnmarshaller(code int) {
 	if code == impsPtr {
-		cf.assign(cf.unmarshalPointer)
+		cf.decoder = cf.unmarshalPointer
 	} else {
-		cf.assign(cf.unmarshalValue)
+		cf.decoder = cf.unmarshalValue
 	}
 }
 
@@ -55,17 +52,17 @@ func (cf *cfield) unmarshalValue(cell *reflect.Value, row *Row) error {
 func (cf *cfield) assignDecoder() {
 	switch cf.structField.Type.Kind() {
 	case reflect.String:
-		cf.assign(cf.decodeString)
+		cf.decoder = cf.decodeString
 	case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8:
-		cf.assign(cf.decodeInt)
+		cf.decoder = cf.decodeInt
 	case reflect.Float32:
-		cf.assign(cf.decodeFloat(32))
+		cf.decoder = cf.decodeFloat(32)
 	case reflect.Float64:
-		cf.assign(cf.decodeFloat(64))
+		cf.decoder = cf.decodeFloat(64)
 	case reflect.Bool:
-		cf.assign(cf.decodeBool)
+		cf.decoder = cf.decodeBool
 	default:
-		cf.assign(cf.ignoreValue)
+		cf.decoder = cf.ignoreValue
 	}
 }
 
@@ -127,4 +124,10 @@ func (cf *cfield) decodeFloat(bit int) decoderFn {
 // ignoreValue does nothing. This is for unsupported types.
 func (cf *cfield) ignoreValue(cell *reflect.Value, row *Row) error {
 	return nil
+}
+
+// unassignedDecoder is the default decoder.  It returns an error since it should
+// have been assigned.
+func (cf *cfield) unassignedDecoder(cell *reflect.Value, row *Row) error {
+	return fmt.Errorf("no decoder for %v\n", cf.structField.Name)
 }

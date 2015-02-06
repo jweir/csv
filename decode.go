@@ -166,10 +166,7 @@ func (dec *decoder) mapFieldsToCols(cols []string) {
 		index, ok := cMap[name]
 
 		if ok == true {
-			cf := cfield{
-				colIndex:    index,
-				structField: f,
-			}
+			cf := newCfield(index, f)
 
 			if code, err := impsUnmarshaller(f.Type, new(Unmarshaler)); err == nil {
 				cf.assignUnmarshaller(code)
@@ -238,7 +235,7 @@ func (dec *decoder) set(row *Row, el *reflect.Value) error {
 	for _, cf := range dec.cfields {
 		field := cf.structField
 		f := el.FieldByName(field.Name)
-		err := cf.decode(&f, row)
+		err := cf.decoder(&f, row)
 
 		if err != nil {
 			return err
