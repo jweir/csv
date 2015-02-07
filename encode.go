@@ -51,7 +51,6 @@ func Marshal(i interface{}) ([]byte, error) {
 	el := data.Index(0)
 	enc, err := newEncoder(el)
 
-	// Write the column headers
 	if err != nil {
 		return []byte{}, err
 	}

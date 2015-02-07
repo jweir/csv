@@ -179,7 +179,7 @@ func (dec *decoder) mapFieldsToCols(cols []string) {
 	}
 }
 
-// exportedFields returns a slice of fields which can be set
+// exportedFields returns a slice of exported fields
 func exportedFields(t reflect.Type) []*reflect.StructField {
 	var out []*reflect.StructField
 
