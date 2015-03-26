@@ -5,13 +5,17 @@ import (
 	"testing"
 )
 
+type X struct {
+	First string
+}
+
 type P struct {
 	First string
 	Last  string
 }
 
-type X struct {
-	First string
+func (p P) MarshalCSV() ([]byte, error) {
+	return []byte(p.First + " " + p.Last), nil
 }
 
 func TestMarshal_without_a_slice(t *testing.T) {

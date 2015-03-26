@@ -4,10 +4,6 @@ import (
 	"fmt"
 )
 
-func (p P) MarshalCSV() ([]byte, error) {
-	return []byte(p.First + " " + p.Last), nil
-}
-
 func ExampleMarshal() {
 	type Person struct {
 		Name    string `csv:"FullName"`
