@@ -9,9 +9,9 @@ import (
 type simple struct {
 	Name    string `csv:"FullName"`
 	Gender  string
-	private int `csv:"-"`
-	Age     int
+	private int    `csv:"-"`
 	Ignore  string `csv:"-"`
+	Age     int
 }
 
 func TestHeader(t *testing.T) {
