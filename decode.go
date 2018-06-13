@@ -43,7 +43,7 @@ type Unmarshaler interface {
 
 	// UnmarshalCSV receives a string with the column value matching this field
 	// and a reference to the the current row.
-	// This allows composing a value from mutliple columns.
+	// This allows composing a value from multiple columns.
 	UnmarshalCSV(string, *Row) error
 }
 

@@ -49,6 +49,9 @@ func Marshal(i interface{}) ([]byte, error) {
 	}
 
 	el := data.Index(0)
+	if el.Kind() == reflect.Interface {
+		el = el.Elem()
+	}
 	enc, err := newEncoder(el)
 
 	if err != nil {
@@ -120,6 +123,10 @@ func (enc *encoder) encodeRow(v reflect.Value) ([]string, error) {
 	var row []string
 	// TODO env.columns should map to a cfield
 	// iterate over each cfield and encode with it
+
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
 	l := v.Type().NumField()
 
 	for x := 0; x < l; x++ {
