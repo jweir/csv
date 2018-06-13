@@ -80,7 +80,7 @@ func TestExportedFields(t *testing.T) {
 	fs := exportedFields(reflect.TypeOf(s{}))
 
 	if len(fs) != 2 {
-		t.Error("Incorrect number of exported fields 2 expected got %d", len(fs))
+		t.Errorf("Incorrect number of exported fields 2 expected got %d", len(fs))
 	}
 
 	if fs[0].Name != "Name" || fs[1].Name != "Age" {
