@@ -43,6 +43,9 @@ func Marshal(i interface{}) ([]byte, error) {
 	// encoder each row
 
 	data := reflect.ValueOf(i)
+	if data.IsNil()  {
+		return []byte{}, nil
+	}
 
 	if data.Kind() != reflect.Slice {
 		return []byte{}, errors.New("only slices can be marshalled")
