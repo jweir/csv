@@ -1,9 +1,9 @@
 package csv
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
-	"bytes"
 )
 
 type X struct {
@@ -69,42 +69,41 @@ func TestEncodeFieldValue(t *testing.T) {
 
 }
 
-func TestMarshalCsvOfStructs(t *testing.T) {
-
+func TestMarshalCSVOfStructs(t *testing.T) {
 	type ST struct {
-		A string
+		Label string
 	}
 
-	expected := []byte(`A
-ASD
-a
-` )
-	data := []ST{{"ASD"}, {"a"}}
+	expected := []byte(`Label
+Value 1
+Value 2
+`)
+	data := []ST{{"Value 1"}, {"Value 2"}}
+
 	out, err := Marshal(data)
 	if err != nil {
 		t.Logf("Failed to marshal to csv ")
 		t.Fail()
 	}
-	if ! bytes.Equal(out, expected) {
+	if !bytes.Equal(out, expected) {
 		t.Logf("Failed to marshal to correct format")
 		t.Fail()
 	}
 }
 
-func TestMarshalCsvOfPointers(t *testing.T) {
-
-	expected := []byte(`A
-ASD
-` )
+func TestMarshalCSVOfPointers(t *testing.T) {
+	expected := []byte(`Label
+Value 1
+`)
 	tPointer := []interface{}{}
-	tPointer = append(tPointer, struct{ A string }{"ASD"})
+	tPointer = append(tPointer, struct{ Label string }{"Value 1"})
 	out, err := Marshal(tPointer)
 
 	if err != nil {
 		t.Logf("Failed to marshal to csv ")
 	}
 
-	if ! bytes.Equal(out, expected) {
+	if !bytes.Equal(out, expected) {
 		t.Logf("Failed to marshal to correct format")
 		t.Fail()
 	}

@@ -69,8 +69,7 @@ func Unmarshal(doc []byte, v interface{}) error {
 		return err
 	}
 
-	dec.unmarshal()
-	return nil
+	return dec.unmarshal()
 }
 
 func (dec *decoder) unmarshal() error {

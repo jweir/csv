@@ -47,7 +47,10 @@ func Marshal(i interface{}) ([]byte, error) {
 	if data.Kind() != reflect.Slice {
 		return []byte{}, errors.New("only slices can be marshalled")
 	}
-	if data.IsNil()  {
+
+	// This block was added by a user who ran into an issue
+	// with nil data.  There is no test case for this.
+	if data.IsNil() {
 		return []byte{}, nil
 	}
 
@@ -170,8 +173,6 @@ func (enc *encoder) encodeCol(fv reflect.Value, st reflect.StructTag) string {
 	default:
 		panic(fmt.Sprintf("Unsupported type %s", fv.Kind()))
 	}
-
-	return ""
 }
 
 func encodeFloat(bits int, f reflect.Value) string {

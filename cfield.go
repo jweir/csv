@@ -37,16 +37,16 @@ func (cf *cfield) assignUnmarshaller(code int) {
 func (cf *cfield) unmarshalPointer(cell *reflect.Value, row *Row) error {
 	val := row.At(cf.colIndex)
 	m := cell.Addr().Interface().(Unmarshaler)
-	m.UnmarshalCSV(val, row)
+	err := m.UnmarshalCSV(val, row)
 
-	return nil
+	return err
 }
 
 func (cf *cfield) unmarshalValue(cell *reflect.Value, row *Row) error {
 	val := row.At(cf.colIndex)
 	m := cell.Interface().(Unmarshaler)
-	m.UnmarshalCSV(val, row)
-	return nil
+	err := m.UnmarshalCSV(val, row)
+	return err
 }
 
 func (cf *cfield) assignDecoder() {
@@ -129,5 +129,5 @@ func (cf *cfield) ignoreValue(cell *reflect.Value, row *Row) error {
 // unassignedDecoder is the default decoder.  It returns an error since it should
 // have been assigned.
 func (cf *cfield) unassignedDecoder(cell *reflect.Value, row *Row) error {
-	return fmt.Errorf("no decoder for %v\n", cf.structField.Name)
+	return fmt.Errorf("no decoder for %v", cf.structField.Name)
 }
