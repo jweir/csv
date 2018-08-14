@@ -79,18 +79,13 @@ func TestMarshalCsvOfStructs(t *testing.T) {
 ASD
 a
 ` )
-
-	data := []struct{
-		A string
-	}{{"ASD"}}
-
-	data = append(data , ST{"a"})
-	out, err  := Marshal(data)
-	if  err  != nil {
+	data := []ST{{"ASD"}, {"a"}}
+	out, err := Marshal(data)
+	if err != nil {
 		t.Logf("Failed to marshal to csv ")
 		t.Fail()
 	}
-	if ! bytes.Equal(out , expected) {
+	if ! bytes.Equal(out, expected) {
 		t.Logf("Failed to marshal to correct format")
 		t.Fail()
 	}
@@ -102,13 +97,14 @@ func TestMarshalCsvOfPointers(t *testing.T) {
 ASD
 ` )
 	tPointer := []interface{}{}
-	tPointer = append(tPointer, struct{A string}{"ASD"})
-	out, err  := Marshal(tPointer)
-	if  err  != nil {
+	tPointer = append(tPointer, struct{ A string }{"ASD"})
+	out, err := Marshal(tPointer)
+
+	if err != nil {
 		t.Logf("Failed to marshal to csv ")
 	}
 
-	if ! bytes.Equal(out , expected) {
+	if ! bytes.Equal(out, expected) {
 		t.Logf("Failed to marshal to correct format")
 		t.Fail()
 	}
