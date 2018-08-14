@@ -3,6 +3,7 @@ package csv
 import (
 	"reflect"
 	"testing"
+	"bytes"
 )
 
 type X struct {
@@ -66,4 +67,45 @@ func TestEncodeFieldValue(t *testing.T) {
 		}
 	}
 
+}
+
+func TestMarshalCsvOfStructs(t *testing.T) {
+
+	type ST struct {
+		A string
+	}
+
+	expected := []byte(`A
+ASD
+a
+` )
+	data := []ST{{"ASD"}, {"a"}}
+	out, err := Marshal(data)
+	if err != nil {
+		t.Logf("Failed to marshal to csv ")
+		t.Fail()
+	}
+	if ! bytes.Equal(out, expected) {
+		t.Logf("Failed to marshal to correct format")
+		t.Fail()
+	}
+}
+
+func TestMarshalCsvOfPointers(t *testing.T) {
+
+	expected := []byte(`A
+ASD
+` )
+	tPointer := []interface{}{}
+	tPointer = append(tPointer, struct{ A string }{"ASD"})
+	out, err := Marshal(tPointer)
+
+	if err != nil {
+		t.Logf("Failed to marshal to csv ")
+	}
+
+	if ! bytes.Equal(out, expected) {
+		t.Logf("Failed to marshal to correct format")
+		t.Fail()
+	}
 }
