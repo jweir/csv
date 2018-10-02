@@ -73,6 +73,23 @@ func Unmarshal(doc []byte, v interface{}) error {
 	return nil
 }
 
+func UnmarshalReader(reader *csv.Reader, v interface{}) error {
+	rv, err := checkForSlice(v)
+
+	if err != nil {
+		return err
+	}
+
+	dec, err := newDecoderReader(reader, rv)
+
+	if err != nil {
+		return err
+	}
+
+	dec.unmarshal()
+	return nil
+}
+
 func (dec *decoder) unmarshal() error {
 	for {
 		raw, err := dec.csv.Read()
@@ -204,8 +221,13 @@ func exportedFields(t reflect.Type) []*reflect.StructField {
 func newDecoder(doc []byte, rv reflect.Value) (*decoder, error) {
 	b := bytes.NewReader(doc)
 	r := csv.NewReader(b)
-	cols, err := r.Read()
 
+	return newDecoderReader(r, rv)
+}
+
+func newDecoderReader(r *csv.Reader, rv reflect.Value) (*decoder, error) {
+
+	cols, err := r.Read()
 	if err != nil {
 		return nil, err
 	}

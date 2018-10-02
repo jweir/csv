@@ -1,7 +1,9 @@
 package csv
 
 import (
+	"encoding/csv"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -141,5 +143,28 @@ Jay,23`
 
 	if oo[0].Name.V != "Jay 23" {
 		t.Errorf("custom unmarshal did not work (%s)", oo[0].Name.V)
+	}
+}
+
+type UR struct {
+	Name string `csv:"Name"`
+	Age  string `csv:"Age"`
+}
+
+func TestUnmarshalReader(t *testing.T) {
+	doc := `Name|Age
+James|39`
+
+	reader := csv.NewReader(strings.NewReader(doc))
+	reader.Comma = '|'
+
+	var oo []UR
+
+	if err := UnmarshalReader(reader, &oo); err != nil {
+		t.Fail()
+	}
+
+	if oo[0].Name != `James` {
+		t.Fail()
 	}
 }
